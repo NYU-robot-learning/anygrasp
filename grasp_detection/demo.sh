@@ -1,1 +1,1 @@
-python demo.py --checkpoint_path log/checkpoint_detection.tar --top_down_grasp --debug --open_communication
+python demo2.py --checkpoint_path log/checkpoint_detection.tar --top_down_grasp --open_communication --debug

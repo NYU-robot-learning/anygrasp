@@ -28,7 +28,7 @@ context = zmq.Context()
 # Creating a REP socket
 if cfgs.open_communication:
     socket = context.socket(zmq.REP)
-    socket.bind("tcp://*:5556")
+    socket.bind("tcp://*:5555")
 
 def send_array(socket, A, flags=0, copy=True, track=False):
     """send a numpy array with metadata"""
@@ -51,7 +51,7 @@ def get_bounding_box(image):
     processor = OwlViTProcessor.from_pretrained("google/owlvit-base-patch32")
     model = OwlViTForObjectDetection.from_pretrained("google/owlvit-base-patch32")
 
-    texts = [["bowl"]]  
+    texts = [["yellow bottle"]]  
     inputs = processor(text=texts, images=image, return_tensors="pt")
     outputs = model(**inputs)
 
@@ -91,114 +91,99 @@ def demo(data_dir):
     anygrasp.load_net()
 
     # get data
-    flag = True
-    while flag:
-        if cfgs.open_communication:
-            colors = recv_array(socket)
-            image = Image.fromarray(colors)
-            colors = colors / 255.0
-            socket.send_string("RGB received")
-            depths = recv_array(socket)
-            socket.send_string("depth received")
-            #points = recv_array(socket)
-            #socket.send_string("points received")
-            fx, fy, cx, cy = recv_array(socket)
-            socket.send_string("intrinsics received")
-            print(socket.recv_string())
-            #print(f"fx, fy, cx, cy: {fx}, {fy}, {cx}, {cy}, {scale}")
-            scale = 1 
+    
+    if cfgs.open_communication:
+        colors = recv_array(socket)
+        image = Image.fromarray(colors)
+        colors = colors / 255.0
+        socket.send_string("RGB received")
+        depths = recv_array(socket)
+        socket.send_string("depth received")
+    else:
+        colors = np.array(Image.open(os.path.join(data_dir, 'peiqi_test_rgb21.png')))
+        image = Image.open(os.path.join(data_dir, 'peiqi_test_rgb21.png'))
+        colors = colors / 255.0
+        depths = np.array(Image.open(os.path.join(data_dir, 'peiqi_test_depth21.png')))
+
+    # print(colors.shape, colors.size, Image.fromarray(colors *255, mode="RGB").size)
+    [crop_x_min, crop_y_min, crop_x_max, crop_y_max] = get_bounding_box(image)
+    # crop_x_min, crop_y_min, crop_x_max, crop_y_max = crop_x_min - 2, crop_y_min - 2, crop_x_max + 2, crop_y_max + 2
+    print(crop_x_min, crop_y_min, crop_x_max, crop_y_max)
+    if cfgs.crop:
+        colors = colors[crop_y_min: (crop_y_max+1), crop_x_min: (crop_x_max+1)]
+        depths = depths[crop_y_min: (crop_y_max+1), crop_x_min: (crop_x_max+1)]
+
+    # exit()
+    # get camera intrinsics
+    # fx, fy = 927.17, 927.37
+    # cx, cy = 651.32, 349.62
+    # fx, fy,  cx, cy = 306, 306, 211, 122
+    fx, fy, cx, cy = 306, 306, 118, 211
+    scale = 1000.0
+
+    # set workspace
+    xmin, xmax = -1.19, 1.12
+    ymin, ymax = -1.02, 1.35
+    zmin, zmax = 0.5, 50.0
+    lims = [xmin, xmax, ymin, ymax, zmin, zmax]
+
+    # get point cloud
+    if not cfgs.crop:
+        xmap, ymap = np.arange(depths.shape[1]), np.arange(depths.shape[0])
+    else:
+        xmap, ymap = np.arange(crop_x_min, crop_x_max+1), np.arange(crop_y_min, crop_y_max+1)
+    xmap, ymap = np.meshgrid(xmap, ymap)
+    print(xmap.shape)
+    print(depths.shape)
+    points_z = depths / 1000
+    points_x = (xmap - cx) / fx * points_z
+    points_y = (ymap - cy) / fy * points_z
+
+    print(f"x - [{np.min(points_x)}. {np.max(points_x)}]")
+    print(f"y - [{np.min(points_y)}. {np.max(points_y)}]")
+    print(f"z - [{np.min(points_z)}. {np.max(points_z)}]")
+
+    # remove outlier
+    mask = (points_z > 0) & (points_z < 3)
+    points = np.stack([points_x, -points_y, points_z], axis=-1)
+    points = points[mask].astype(np.float32)
+    print(points.shape)
+    colors = colors[mask].astype(np.float32)
+    print(points.min(axis=0), points.max(axis=0))
+
+    # get prediction
+    gg, cloud = anygrasp.get_grasp(points, colors, lims)
+
+    if len(gg) == 0:
+        print('No Grasp detected after collision detection!')
+
+    gg = gg.nms().sort_by_score()
+    filter_gg = GraspGroup()
+    # print(gg.scores())
+
+    img_drw = ImageDraw.Draw(image)
+    img_drw.rectangle([(crop_x_min, crop_y_min), (crop_x_max, crop_y_max)], outline="red")
+    for g in gg:
+        # delp1 = np.matmul(np.transpose(g.rotation_matrix) , np.array([-g.depth, 0, 0]))
+        # delp2 = np.matmul(np.transpose(g.rotation_matrix) , np.array([0, g.depth, 0]))
+        # delp3 = np.matmul(np.transpose(g.rotation_matrix) , np.array([0, 0, g.depth]))
+        # delp4 = np.matmul(g.rotation_matrix , np.array([-g.depth, 0, 0]))
+        # delp5 = np.matmul(g.rotation_matrix , np.array([0, g.depth, 0]))
+        # delp6 = np.matmul(g.rotation_matrix , np.array([0, 0, g.depth]))
+        grasp_center = g.translation
+        ix, iy = int(((grasp_center[0]*fx)/grasp_center[2]) + cx), int(((-grasp_center[1]*fy)/grasp_center[2]) + cy)
+        if (crop_x_min <= ix) and (ix <= crop_x_max) and (crop_y_min <= iy) and (iy <= crop_y_max):
+            filter_gg.add(g)
+            img_drw.ellipse([(ix-1, iy-1), (ix+1, iy+1)], fill = "green")
+            print(g.width)
         else:
-            colors = np.array(Image.open(os.path.join(data_dir, 'peiqi_test_rgb21.png')))
-            image = Image.open(os.path.join(data_dir, 'peiqi_test_rgb21.png'))
-            colors = colors / 255.0
-            depths = np.array(Image.open(os.path.join(data_dir, 'peiqi_test_depth21.png')))
-            fx, fy, cx, cy, scale = 306, 306, 118, 211, 0.001
+            img_drw.ellipse([(ix-1, iy-1), (ix+1, iy+1)], fill = "red")
         
-        #fx, fy, cx, cy, scale = 306, 306, 118, 211, 0.001
-        # print(colors.shape, colors.size, Image.fromarray(colors *255, mode="RGB").size)
-        [crop_x_min, crop_y_min, crop_x_max, crop_y_max] = get_bounding_box(image)
-        # crop_x_min, crop_y_min, crop_x_max, crop_y_max = crop_x_min - 2, crop_y_min - 2, crop_x_max + 2, crop_y_max + 2
-        print(crop_x_min, crop_y_min, crop_x_max, crop_y_max)
-        # get point cloud
-
-        if not cfgs.crop:
-            xmap, ymap = np.arange(depths.shape[1]), np.arange(depths.shape[0])
-        else:
-            xmap, ymap = np.arange(crop_x_min, crop_x_max+1), np.arange(crop_y_min, crop_y_max+1)
-        xmap, ymap = np.meshgrid(xmap, ymap)
-        print(xmap.shape)
-        print(depths.shape)
-        points_z = depths * scale
-        points_x = (xmap - cx) / fx * points_z
-        points_y = (ymap - cy) / fy * points_z
-
-        bbox_center = [int((crop_x_min + crop_x_max)/2), int((crop_y_min + crop_y_max)/2)]
-        depth_obj = depths[bbox_center[1], bbox_center[0]] * scale
-        print(f"Object height and dist: {((crop_y_max - crop_y_min) * depth_obj)/fy}, {depth_obj}")
-
-        print(f"x - [{np.min(points_x)}. {np.max(points_x)}]")
-        print(f"y - [{np.min(points_y)}. {np.max(points_y)}]")
-        print(f"z - [{np.min(points_z)}. {np.max(points_z)}]")
-
-        # remove outlier
-        mask = (points_z > 0) & (points_z < 3)
-        points = np.stack([points_x, -points_y, points_z], axis=-1)
-        points = points[mask].astype(np.float32)
-        print(f"points shape: {points.shape}")
-        xmin = points[:, 0].min()
-        xmax = points[:, 0].max()
-        ymin = points[:, 1].min()
-        ymax = points[:, 1].max()
-        zmin = points[:, 2].min()
-        zmax = points[:, 2].max()
-        lims = [xmin, xmax, ymin, ymax, zmin, zmax]
-
-        print(points.shape)
-        colors = colors[mask].astype(np.float32)
-        print(points.min(axis=0), points.max(axis=0))
-
-        # get prediction
-        gg, cloud = anygrasp.get_grasp(points, colors, lims)
-
-        if len(gg) == 0:
-            print('No Grasp detected after collision detection!')
-
-        gg = gg.nms().sort_by_score()
-        filter_gg = GraspGroup()
-        # print(gg.scores())
-
-        img_drw = ImageDraw.Draw(image)
-        img_drw.rectangle([(crop_x_min, crop_y_min), (crop_x_max, crop_y_max)], outline="red")
-        for g in gg:
-            # delp1 = np.matmul(np.transpose(g.rotation_matrix) , np.array([-g.depth, 0, 0]))
-            # delp2 = np.matmul(np.transpose(g.rotation_matrix) , np.array([0, g.depth, 0]))
-            # delp3 = np.matmul(np.transpose(g.rotation_matrix) , np.array([0, 0, g.depth]))
-            # delp4 = np.matmul(g.rotation_matrix , np.array([-g.depth, 0, 0]))
-            # delp5 = np.matmul(g.rotation_matrix , np.array([0, g.depth, 0]))
-            # delp6 = np.matmul(g.rotation_matrix , np.array([0, 0, g.depth]))
-            grasp_center = g.translation
-            ix, iy = int(((grasp_center[0]*fx)/grasp_center[2]) + cx), int(((-grasp_center[1]*fy)/grasp_center[2]) + cy)
-            if (crop_x_min <= ix) and (ix <= crop_x_max) and (crop_y_min <= iy) and (iy <= crop_y_max):
-                filter_gg.add(g)
-                img_drw.ellipse([(ix-1, iy-1), (ix+1, iy+1)], fill = "green")
-                # print(g.width)
-            else:
-                img_drw.ellipse([(ix-1, iy-1), (ix+1, iy+1)], fill = "red")
-            
-            # print(grasp_center, ix, iy, g.depth)
-
-        flag = False
-        if (len(filter_gg) == 0):
-            print("No grasp poses detected for this object try to move the object a little and try again")
-            exit()
-            flag = True
-            socket.send_string("fail")
-            # print(socket.recv_string())
-            print("--------------Waiting for recaptured Image------------------------")
-        else:
-            socket.send_string("success")
-            # print(socket.recv_string())
-        image.save("./example_data/grasp_projections21.png")
+        # print(grasp_center, ix, iy, g.depth)
+    if (len(filter_gg) == 0):
+        print("No grasp poses detected for this object try to move the object a little and try again")
+        exit()
+    image.save("./example_data/grasp_projections21.png")
 
     filter_gg = filter_gg.nms().sort_by_score()
 
