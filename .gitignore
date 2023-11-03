@@ -6,3 +6,6 @@
 .DS_Store
 .TimeRecord
 license
+/grasp_detection/log/*
+/grasp_detection/example_data/*
+*.png

@@ -3,17 +3,15 @@ import argparse
 import torch
 import numpy as np
 import open3d as o3d
-from PIL import Image, ImageChops, ImageDraw
+from PIL import Image, ImageDraw
 import zmq
-import math, copy
+import math
 
 from matplotlib import pyplot as plt
-from transformers import OwlViTProcessor, OwlViTForObjectDetection
-from segment_anything import sam_model_registry, SamPredictor
 
 from gsnet import AnyGrasp
 from graspnetAPI import GraspGroup
-#from segment_anything import sam_model_registry, SamAutomaticMaskGenerator, SamPredictor
+from utils.utils import get_bounding_box, show_mask, sam_segment, visualize_cloud_grippers
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--checkpoint_path', required=True, help='Model checkpoint path')
@@ -24,6 +22,7 @@ parser.add_argument('--top_down_grasp', action='store_true', help='Output top-do
 parser.add_argument('--debug', action='store_true', help='Enable visualization')
 parser.add_argument('--open_communication', action='store_true', help='Use image transferred from the robot')
 parser.add_argument('--crop', action='store_true', help='Passing cropped image to anygrasp')
+parser.add_argument('--environment', default = '/data/pick_and_place_exps/Sofa', help='Environment name')
 cfgs = parser.parse_args()
 cfgs.max_gripper_width = max(0, min(0.1, cfgs.max_gripper_width))
 
@@ -51,101 +50,6 @@ def recv_array(socket, flags=0, copy=True, track=False):
     A = np.frombuffer(msg, dtype=md['dtype'])
     return A.reshape(md['shape'])
 
-def get_bounding_box(image, text, tries):
-    processor = OwlViTProcessor.from_pretrained("google/owlvit-base-patch32")
-    model = OwlViTForObjectDetection.from_pretrained("google/owlvit-base-patch32")
-
-    texts = [[text, "A photo of " + text]]  
-    inputs = processor(text=texts, images=image, return_tensors="pt")
-    outputs = model(**inputs)
-
-    # Target image sizes (height, width) to rescale box predictions [batch_size, 2]
-    print(image.size[::-1])
-    target_sizes = torch.Tensor([image.size[::-1]])
-    print(target_sizes)
-    # Convert outputs (bounding boxes and class logits) to COCO API
-    results = processor.post_process_object_detection(outputs=outputs, target_sizes=target_sizes, threshold=0.01)
-    print(f"results - {results}")
-    i = 0  # Retrieve predictions for the first image for the corresponding text queries
-    text = texts[i]
-    boxes, scores, labels = results[i]["boxes"], results[i]["scores"], results[i]["labels"]
-    if len(boxes) == 0:
-        return None
-    max_score = np.max(scores.detach().numpy())
-    print(f"max_score: {max_score}")
-    max_ind = np.argmax(scores.detach().numpy())
-    max_box = boxes.detach().numpy()[max_ind].astype(int)
-
-    #mask_predictor.set_image(image.permute(1, 2, 0).numpy())
-    #transformed_boxes = mask_predictor.transform.apply_boxes_torch(max_box.reshape(-1, 4), image.shape[1:])  
-    #masks, iou_predictions, low_res_masks = mask_predictor.predict_torch(
-    #    point_coords=None,
-    #    point_labels=None,
-    #    boxes=transformed_boxes,
-    #    multimask_output=False
-    #)
-    # masks = masks[:, 0, :, :]
-    new_image = copy.deepcopy(image)
-    img_drw = ImageDraw.Draw(new_image)
-    img_drw.rectangle([(max_box[0], max_box[1]), (max_box[2], max_box[3])], outline="green")
-    img_drw.text((max_box[0], max_box[1]), str(round(max_score.item(), 3)), fill="green")
-
-    for box, score, label in zip(boxes, scores, labels):
-        box = [int(i) for i in box.tolist()]
-        print(f"Detected {text[label]} with confidence {round(score.item(), 3)} at location {box}")
-        if (score == max_score):
-            img_drw.rectangle([(box[0], box[1]), (box[2], box[3])], outline="red")
-            img_drw.text((box[0], box[1]), str(round(max_score.item(), 3)), fill="red")
-        else:
-            img_drw.rectangle([(box[0], box[1]), (box[2], box[3])], outline="white")
-    new_image.save(f"./example_data/bounding_box21_{tries}.png")
-    return max_box    
-
-def show_mask(mask, ax, random_color=False):
-    if random_color:
-        color = np.concatenate([np.random.random(3), np.array([0.6])], axis=0)
-    else:
-        color = np.array([30/255, 144/255, 255/255, 0.6])
-    h, w = mask.shape[-2:]
-    mask_image = mask.reshape(h, w, 1) * color.reshape(1, 1, -1)
-    ax.imshow(mask_image)
-
-def show_masks_on_image(raw_image, masks, scores):
-    if len(masks.shape) == 4:
-      masks = masks.squeeze()
-    if scores.shape[0] == 1:
-      scores = scores.squeeze()
-
-    nb_predictions = scores.shape[-1]
-    fig, axes = plt.subplots(1, nb_predictions, figsize=(15, 15))
-
-    for i, (mask, score) in enumerate(zip(masks, scores)):
-      mask = mask.cpu().detach()
-      axes[i].imshow(np.array(raw_image))
-      show_mask(mask, axes[i])
-    #   axes[i].title.set_text(f"Mask {i+1}, Score: {score.item():.3f}")
-      axes[i].axis("off")
-    plt.show()
-
-def segment(image, bounding_box):
-    sam_checkpoint = "sam_vit_h_4b8939.pth"
-    model_type = "vit_h"
-    device = "cuda"
-
-    sam = sam_model_registry[model_type](checkpoint=sam_checkpoint)
-    sam.to(device=device)
-
-    predictor = SamPredictor(sam)
-    predictor.set_image(image)
-
-    masks, _, _ = predictor.predict(
-        point_coords = None,
-        point_labels = None,
-        box = bounding_box,
-        multimask_output = False
-    )
-
-    return masks
 
 def send_msg(a, b, c):
     print(socket.recv_string())
@@ -173,10 +77,10 @@ def gpu_stats():
         print(f"  Free Memory: {mem_info[gpu_id] / (1024 ** 2):.2f} MB")
 
 def demo():
-    gpu_stats()
+    #gpu_stats()
     anygrasp = AnyGrasp(cfgs)
     anygrasp.load_net()
-    gpu_stats()
+    #gpu_stats()
 
     # get data
     tries = 1
@@ -266,7 +170,7 @@ def demo():
 
             if mode == "place":
                 print("placing mode")
-                masks = segment(np.array(image), np.array([crop_x_min, crop_y_min, crop_x_max, crop_y_max]))
+                masks = sam_segment(np.array(image), np.array([crop_x_min, crop_y_min, crop_x_max, crop_y_max]))
                 seg_mask = np.array(masks[0])
                 print(seg_mask)
                 plt.figure(figsize=(10, 10))
@@ -393,7 +297,8 @@ def demo():
                 exit()
             else:
                 # remove outlier
-                mask = (points_z > 0) & (points_z < 3)
+                print(f"max points z - {np.max(points_z)}")
+                mask = (points_z > 0) & (points_z < 2)
                 points = np.stack([points_x, -points_y, points_z], axis=-1)
                 points = points[mask].astype(np.float32)
                 print(f"points shape: {points.shape}")
@@ -408,10 +313,8 @@ def demo():
                 colors_m = colors[mask].astype(np.float32)
                 print(points.min(axis=0), points.max(axis=0))
 
-                gpu_stats()
                 # get prediction
                 gg, cloud = anygrasp.get_grasp(points, colors_m, lims)
-                gpu_stats()
 
                 if len(gg) == 0:
                     print('No Grasp detected after collision detection!')
@@ -498,61 +401,15 @@ def demo():
         filter_grippers = filter_gg.to_open3d_geometry_list()
         for gripper in grippers:
             gripper.transform(trans_mat)
-
-        colors =[[0.3, 0, 0], [0.6, 0, 0], [1, 0, 0],
-                 [0, 0.3, 0], [0, 0.6, 0], [0, 1, 0], 
-                 [0, 0, 0.3], [0, 0, 0.6], [0, 0, 1],
-                 [0.3, 0.3, 0], [0.6, 0.6, 0], [1, 1, 0],
-                 [0.3, 0, 0.3], [0.6, 0, 0.6], [1, 0 ,1],
-                 [0, 0.3, 0.3], [0, 0.6, 0.6], [0, 1, 1],
-                 [0.3, 0.3, 0.3], [0.6, 0.6, 0.6], [1,1,1]]
-        for idx, gripper in enumerate(filter_grippers):
+        for gripper in filter_grippers:
             gripper.transform(trans_mat)
-            g = filter_gg[idx]
-            if max_score != min_score:
-                color_val = (g.score - min_score)/(max_score - min_score)
-            else:
-                color_val = 1
-            color = [color_val, 0, 0]
-            print(g.score, color)
-            # color = colors[idx]
-            gripper.paint_uniform_color(color)
-        # pcd.transform(trans_mat)
         
-        # vis = o3d.visualization.Visualizer()
-        # vis.create_window()
-        # vis.add_geometry([*grippers, cloud])
-        # vis.add_geometry([grippers[0], cloud])
-        coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.2, origin=[0, 0, 0])
-        # o3d.visualizer.add_geometry(coordinate_frame)
-        o3d.visualization.draw_geometries([*grippers, cloud, coordinate_frame])
-        visualizer = o3d.visualization.Visualizer()
-        visualizer.create_window()
-        for gripper in grippers:
-            visualizer.add_geometry(gripper)
-        visualizer.add_geometry(cloud)
-        visualizer.add_geometry(coordinate_frame)
-        #visualizer.run()
-        img = visualizer.capture_screen_float_buffer()
-        cv2.imwrite("output.jpg", img)
-        #visualizer.capture_screen_image('output_image.png') 
-        visualizer.destroy_window()
-        # plt.imshow(image)
-        # plt.show()
-
-        #o3d.visualization.draw_geometries([*filter_grippers, cloud, coordinate_frame])
-        o3d.visualization.draw_geometries([filter_grippers[0], cloud, coordinate_frame])
+        visualize_cloud_grippers(cloud, grippers, visualize = True, 
+                save_file = cfgs.environment + "/" + text + "/" + "anygrasp_poses.jpg")
+        visualize_cloud_grippers(cloud, [filter_grippers[0]], visualize=True, 
+                save_file = cfgs.environment + "/" + text + "/" + "anygrasp_best_pose.jpg")
     
     send_msg(filter_gg[0].translation, filter_gg[0].rotation_matrix, [filter_gg[0].depth, crop_flag, 0])
-    # print(socket.recv_string())
-    # send_array(socket, filter_gg[0].translation)
-    # print(socket.recv_string())
-    # send_array(socket, filter_gg[0].rotation_matrix)
-    # print(socket.recv_string())
-    # send_array(socket, np.array([filter_gg[0].depth, crop_flag, 0]))
-    # print(socket.recv_string())
-    # send_array(socket, np.array([crop_flag]))
-    # print(socket.recv_string())
     socket.send_string("Now you received the gripper pose, good luck.")
         
 if __name__ == '__main__':
