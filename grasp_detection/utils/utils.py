@@ -8,7 +8,7 @@ import open3d as o3d
 from transformers import OwlViTProcessor, OwlViTForObjectDetection
 from segment_anything import sam_model_registry, SamPredictor
 
-def get_bounding_box(image, text, tries):
+def get_bounding_box(image, text, tries, save_file):
     processor = OwlViTProcessor.from_pretrained("google/owlvit-base-patch32")
     model = OwlViTForObjectDetection.from_pretrained("google/owlvit-base-patch32")
 
@@ -46,7 +46,7 @@ def get_bounding_box(image, text, tries):
             img_drw.text((box[0], box[1]), str(round(max_score.item(), 3)), fill="red")
         else:
             img_drw.rectangle([(box[0], box[1]), (box[2], box[3])], outline="white")
-    new_image.save(f"./example_data/bounding_box21_{tries}.png")
+    new_image.save(save_file)
     return max_box    
 
 def show_mask(mask, ax, random_color=False):
@@ -124,7 +124,7 @@ def color_grippers(grippers, max_score, min_score):
 
     return grippers
 
-def visualize_cloud_grippers(cloud, grippers, visualize = True, save_file = None):
+def visualize_cloud_grippers(cloud, grippers, translation = None, rotation = None, visualize = True, save_file = None):
     """
         cloud       : Point cloud of points
         grippers    : list of grippers of form graspnetAPI grasps
@@ -133,15 +133,22 @@ def visualize_cloud_grippers(cloud, grippers, visualize = True, save_file = None
     """
 
     coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.2, origin=[0, 0, 0])
+    if translation is not None:
+        coordinate_frame1 = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.2, origin=[0, 0, 0])
+        print(grippers[0])
+        translation[2] = -translation[2]
+        coordinate_frame1.translate(translation)
+        coordinate_frame1.rotate(rotation)
 
     visualizer = o3d.visualization.Visualizer()
     visualizer.create_window(visible=visualize)
     for gripper in grippers:
         visualizer.add_geometry(gripper)
     visualizer.add_geometry(cloud)
-    visualizer.add_geometry(coordinate_frame)
-    # visualizer.poll_events()
-    # visualizer.update_renderer()
+    if translation is not None:
+        visualizer.add_geometry(coordinate_frame1)
+    visualizer.poll_events()
+    visualizer.update_renderer()
 
     if save_file is not None:
         ## Controlling the zoom
@@ -152,6 +159,7 @@ def visualize_cloud_grippers(cloud, grippers, visualize = True, save_file = None
         visualizer.capture_screen_image(save_file, do_render = True)
 
     if visualize:
+        visualizer.add_geometry(coordinate_frame)
         visualizer.run()
     else:
         visualizer.destroy_window()    

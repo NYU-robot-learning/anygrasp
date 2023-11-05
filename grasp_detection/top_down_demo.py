@@ -11,10 +11,9 @@ from matplotlib import pyplot as plt
 from transformers import OwlViTProcessor, OwlViTForObjectDetection
 from segment_anything import sam_model_registry, SamPredictor
 
-#from gsnet import AnyGrasp
-# from graspnetAPI import GraspGroup, Grasp
 #from segment_anything import sam_model_registry, SamAutomaticMaskGenerator, SamPredictor
 from home_robot.manipulation.voxel_grasps import VoxelGraspGenerator
+from utils.utils import get_bounding_box, show_mask, sam_segment, visualize_cloud_grippers
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--checkpoint_path', required=True, help='Model checkpoint path')
@@ -24,10 +23,10 @@ parser.add_argument('--top_down_grasp', action='store_true', help='Output top-do
 parser.add_argument('--debug', action='store_true', help='Enable visualization')
 parser.add_argument('--open_communication', action='store_true', help='Use image transferred from the robot')
 parser.add_argument('--crop', action='store_true', help='Passing cropped image to anygrasp')
+parser.add_argument('--environment', default = '/data/pick_and_place_exps/Sofa', help='Environment name')
+parser.add_argument('--method', default = 'usa', help='navigation method name')
 cfgs = parser.parse_args()
 cfgs.max_gripper_width = max(0, min(0.1, cfgs.max_gripper_width))
-
-context = zmq.Context()
 
 device = "cuda"
 sam_checkpoint = "sam_vit_h_4b8939.pth"
@@ -40,6 +39,7 @@ predictor = SamPredictor(sam)
 
 # Creating a REP socket
 if cfgs.open_communication:
+    context = zmq.Context()
     socket = context.socket(zmq.REP)
     socket.bind("tcp://*:5558")
 
@@ -59,82 +59,6 @@ def recv_array(socket, flags=0, copy=True, track=False):
     #buf = buffer(msg)
     A = np.frombuffer(msg, dtype=md['dtype'])
     return A.reshape(md['shape'])
-
-def get_bounding_box(image, text, tries):
-    processor = OwlViTProcessor.from_pretrained("google/owlvit-base-patch32")
-    model = OwlViTForObjectDetection.from_pretrained("google/owlvit-base-patch32")
-
-    texts = [[text, "A photo of " + text]]  
-    inputs = processor(text=texts, images=image, return_tensors="pt")
-    outputs = model(**inputs)
-
-    # Target image sizes (height, width) to rescale box predictions [batch_size, 2]
-    print(image.size[::-1])
-    target_sizes = torch.Tensor([image.size[::-1]])
-    print(target_sizes)
-    # Convert outputs (bounding boxes and class logits) to COCO API
-    results = processor.post_process_object_detection(outputs=outputs, target_sizes=target_sizes, threshold=0.01)
-    print(f"results - {results}")
-    i = 0  # Retrieve predictions for the first image for the corresponding text queries
-    text = texts[i]
-    boxes, scores, labels = results[i]["boxes"], results[i]["scores"], results[i]["labels"]
-    if len(boxes) == 0:
-        return None
-    max_score = np.max(scores.detach().numpy())
-    print(f"max_score: {max_score}")
-    max_ind = np.argmax(scores.detach().numpy())
-    max_box = boxes.detach().numpy()[max_ind].astype(int)
-
-    #mask_predictor.set_image(image.permute(1, 2, 0).numpy())
-    #transformed_boxes = mask_predictor.transform.apply_boxes_torch(max_box.reshape(-1, 4), image.shape[1:])  
-    #masks, iou_predictions, low_res_masks = mask_predictor.predict_torch(
-    #    point_coords=None,
-    #    point_labels=None,
-    #    boxes=transformed_boxes,
-    #    multimask_output=False
-    #)
-    # masks = masks[:, 0, :, :]
-    new_image = copy.deepcopy(image)
-    img_drw = ImageDraw.Draw(new_image)
-    img_drw.rectangle([(max_box[0], max_box[1]), (max_box[2], max_box[3])], outline="green")
-    img_drw.text((max_box[0], max_box[1]), str(round(max_score.item(), 3)), fill="green")
-
-    for box, score, label in zip(boxes, scores, labels):
-        box = [int(i) for i in box.tolist()]
-        print(f"Detected {text[label]} with confidence {round(score.item(), 3)} at location {box}")
-        if (score == max_score):
-            img_drw.rectangle([(box[0], box[1]), (box[2], box[3])], outline="red")
-            img_drw.text((box[0], box[1]), str(round(max_score.item(), 3)), fill="red")
-        else:
-            img_drw.rectangle([(box[0], box[1]), (box[2], box[3])], outline="white")
-    new_image.save(f"./example_data/bounding_box21_{tries}.png")
-    return max_box    
-
-def show_mask(mask, ax, random_color=False):
-    if random_color:
-        color = np.concatenate([np.random.random(3), np.array([0.6])], axis=0)
-    else:
-        color = np.array([30/255, 144/255, 255/255, 0.6])
-    h, w = mask.shape[-2:]
-    mask_image = mask.reshape(h, w, 1) * color.reshape(1, 1, -1)
-    ax.imshow(mask_image)
-
-def show_masks_on_image(raw_image, masks, scores):
-    if len(masks.shape) == 4:
-      masks = masks.squeeze()
-    if scores.shape[0] == 1:
-      scores = scores.squeeze()
-
-    nb_predictions = scores.shape[-1]
-    fig, axes = plt.subplots(1, nb_predictions, figsize=(15, 15))
-
-    for i, (mask, score) in enumerate(zip(masks, scores)):
-      mask = mask.cpu().detach()
-      axes[i].imshow(np.array(raw_image))
-      show_mask(mask, axes[i])
-    #   axes[i].title.set_text(f"Mask {i+1}, Score: {score.item():.3f}")
-      axes[i].axis("off")
-    plt.show()
 
 def segment(image, bounding_box):
     global predictor
@@ -270,7 +194,7 @@ def send_msg(a, b, c):
 def demo():
     #anygrasp = AnyGrasp(cfgs)
     #anygrasp.load_net()
-    grasp_generator = VoxelGraspGenerator()
+    grasp_generator = VoxelGraspGenerator(debug = False)
 
     # get data
     tries = 1
@@ -310,7 +234,10 @@ def demo():
             head_tilt = 45/100
             ref_vec = np.array([0, math.cos(head_tilt), -math.sin(head_tilt)])
         
-        [crop_x_min, crop_y_min, crop_x_max, crop_y_max] = get_bounding_box(image, text, tries)
+        if not os.path.exists(cfgs.environment + "/" + text + "/topdown/"):
+            os.makedirs(cfgs.environment + "/" + text + "/topdown/")
+        [crop_x_min, crop_y_min, crop_x_max, crop_y_max] = get_bounding_box(image, text, tries,
+            save_file=cfgs.environment + "/" + text + "/topdown/" + cfgs.method +  "_topdown_open_owl_vit_bboxes.jpg")
         print(crop_x_min, crop_y_min, crop_x_max, crop_y_max)
 
         bbox_center = [int((crop_x_min + crop_x_max)/2), int((crop_y_min + crop_y_max)/2)]
@@ -617,10 +544,16 @@ def demo():
         # vis.create_window()
         # vis.add_geometry([*grippers, cloud])
         # vis.add_geometry([grippers[0], cloud])
-        coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.2, origin=[0, 0, 0])
+        #coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.2, origin=[0, 0, 0])
+        if not os.path.exists(cfgs.environment + "/" + text):
+            os.makedirs(cfgs.environment + "/" + text + "/topdown/")
+        visualize_cloud_grippers(cloud, grippers, visualize = True, 
+                save_file = cfgs.environment + "/" + text + "/topdown/" + cfgs.method +  "_topdown_poses.jpg")
+        #visualize_cloud_grippers(world_cloud, world_grippers, visualize=True, 
+        #        save_file = cfgs.environment + "/" + text + "/" + cfgs.method + "_topdown_world_pose.jpg")
         # o3d.visualizer.add_geometry(coordinate_frame)
-        o3d.visualization.draw_geometries([*grippers, cloud, coordinate_frame])
-        o3d.visualization.draw_geometries([*world_grippers, world_cloud, coordinate_frame])
+        #o3d.visualization.draw_geometries([*grippers, cloud, coordinate_frame])
+        #o3d.visualization.draw_geometries([*world_grippers, world_cloud, coordinate_frame])
         # plt.imshow(image)
         # plt.show()
 
