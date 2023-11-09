@@ -23,7 +23,7 @@ parser.add_argument('--top_down_grasp', action='store_true', help='Output top-do
 parser.add_argument('--debug', action='store_true', help='Enable visualization')
 parser.add_argument('--open_communication', action='store_true', help='Use image transferred from the robot')
 parser.add_argument('--crop', action='store_true', help='Passing cropped image to anygrasp')
-parser.add_argument('--environment', default = '/data/pick_and_place_exps/Sofa', help='Environment name')
+parser.add_argument('--environment', default = '/data/pick_and_place_exps/Sofa2', help='Environment name')
 parser.add_argument('--method', default = 'usa', help='navigation method name')
 cfgs = parser.parse_args()
 cfgs.max_gripper_width = max(0, min(0.1, cfgs.max_gripper_width))
@@ -234,10 +234,10 @@ def demo():
             head_tilt = 45/100
             ref_vec = np.array([0, math.cos(head_tilt), -math.sin(head_tilt)])
         
-        if not os.path.exists(cfgs.environment + "/" + text + "/topdown/"):
-            os.makedirs(cfgs.environment + "/" + text + "/topdown/")
+        if not os.path.exists(cfgs.environment + "/" + text + "/topdown/" + cfgs.method):
+            os.makedirs(cfgs.environment + "/" + text + "/topdown/" + cfgs.method)
         [crop_x_min, crop_y_min, crop_x_max, crop_y_max] = get_bounding_box(image, text, tries,
-            save_file=cfgs.environment + "/" + text + "/topdown/" + cfgs.method +  "_topdown_open_owl_vit_bboxes.jpg")
+            save_file=cfgs.environment + "/" + text + "/topdown/" + cfgs.method +  "/owl_vit_bboxes.jpg")
         print(crop_x_min, crop_y_min, crop_x_max, crop_y_max)
 
         bbox_center = [int((crop_x_min + crop_x_max)/2), int((crop_y_min + crop_y_max)/2)]
@@ -548,7 +548,7 @@ def demo():
         if not os.path.exists(cfgs.environment + "/" + text):
             os.makedirs(cfgs.environment + "/" + text + "/topdown/")
         visualize_cloud_grippers(cloud, grippers, visualize = True, 
-                save_file = cfgs.environment + "/" + text + "/topdown/" + cfgs.method +  "_topdown_poses.jpg")
+                save_file = cfgs.environment + "/" + text + "/topdown/" + cfgs.method +  "/topdown_poses.jpg")
         #visualize_cloud_grippers(world_cloud, world_grippers, visualize=True, 
         #        save_file = cfgs.environment + "/" + text + "/" + cfgs.method + "_topdown_world_pose.jpg")
         # o3d.visualizer.add_geometry(coordinate_frame)

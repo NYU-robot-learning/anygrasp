@@ -22,7 +22,7 @@ parser.add_argument('--top_down_grasp', action='store_true', help='Output top-do
 parser.add_argument('--debug', action='store_true', help='Enable visualization')
 parser.add_argument('--open_communication', action='store_true', help='Use image transferred from the robot')
 parser.add_argument('--crop', action='store_true', help='Passing cropped image to anygrasp')
-parser.add_argument('--environment', default = '/data/pick_and_place_exps/Sofa', help='Environment name')
+parser.add_argument('--environment', default = '/data/pick_and_place_exps/Sofa2', help='Environment name')
 parser.add_argument('--method', default = 'usa', help='navigation method name')
 cfgs = parser.parse_args()
 cfgs.max_gripper_width = max(0, min(0.1, cfgs.max_gripper_width))
@@ -106,8 +106,8 @@ def demo():
         mode = socket.recv_string()
         print(f"mode - {mode}")
         socket.send_string("Mode received")
-        if not os.path.exists(cfgs.environment + "/" + text + "/anygrasp/"):
-            os.make_dirs(cfgs.environment + "/" + text + "/anygrasp/")
+        if not os.path.exists(cfgs.environment + "/" + text + "/anygrasp/" + cfgs.method):
+            os.makedirs(cfgs.environment + "/" + text + "/anygrasp/" + cfgs.method)
         # data_dir = "./example_data/"
         # colors = np.array(Image.open(os.path.join(data_dir, 'peiqi_test_rgb21.png')))
         # image = Image.open(os.path.join(data_dir, 'peiqi_test_rgb21.png'))
@@ -118,7 +118,7 @@ def demo():
         # mode = "place"
         
         [crop_x_min, crop_y_min, crop_x_max, crop_y_max] = get_bounding_box(image, text, tries,
-                                            save_file=cfgs.environment + "/" + text + "/anygrasp/" + cfgs.method +  "_anygrasp_owl_vit_bboxes.jpg")
+                                            save_file=cfgs.environment + "/" + text + "/anygrasp/" + cfgs.method +  "/owl_vit_bboxes.jpg")
         print(crop_x_min, crop_y_min, crop_x_max, crop_y_max)
 
         bbox_center = [int((crop_x_min + crop_x_max)/2), int((crop_y_min + crop_y_max)/2)]
@@ -322,7 +322,7 @@ def demo():
                 if len(gg) == 0:
                     print('No Grasp detected after collision detection!')
                     send_msg([0], [0], [0, 0, 2])
-                    if tries < 13:
+                    if tries < 10:
                         tries = tries + 1
                         print(f"try no: {tries}")
                         socket.send_string("No poses, Have to try again")
@@ -372,7 +372,7 @@ def demo():
                 if (len(filter_gg) == 0):
                     print("No grasp poses detected for this object try to move the object a little and try again")
                     send_msg([0], [0], [0, 0, 2])
-                    if tries < 12:
+                    if tries < 10:
                         tries = tries + 1
                         print(f"try no: {tries}")
                         socket.send_string("No poses, Have to try again")
@@ -389,7 +389,7 @@ def demo():
                     del cloud
                     
     # image.save("./example_data/grasp_projections21.png")
-    image.save(cfgs.environment + "/" + text + "/anygrasp/" + cfgs.method +  "_anygrasp_grasp_projections.jpg")
+    image.save(cfgs.environment + "/" + text + "/anygrasp/" + cfgs.method +  "/grasp_projections.jpg")
     filter_gg = filter_gg.nms().sort_by_score()
 
     # gg_pick = filter_gg[0:20]
@@ -407,9 +407,9 @@ def demo():
             gripper.transform(trans_mat)
         
         visualize_cloud_grippers(cloud, grippers, visualize = True, 
-                save_file = cfgs.environment + "/" + text  + "/anygrasp/" + cfgs.method +  "_anygrasp_poses.jpg")
+                save_file = cfgs.environment + "/" + text  + "/anygrasp/" + cfgs.method +  "/poses.jpg")
         visualize_cloud_grippers(cloud, [filter_grippers[0]], visualize=True, 
-                save_file = cfgs.environment + "/" + text  + "/anygrasp/" + cfgs.method + "_anygrasp_best_pose.jpg")
+                save_file = cfgs.environment + "/" + text  + "/anygrasp/" + cfgs.method + "/best_pose.jpg")
     
     send_msg(filter_gg[0].translation, filter_gg[0].rotation_matrix, [filter_gg[0].depth, crop_flag, 0])
     socket.send_string("Now you received the gripper pose, good luck.")
