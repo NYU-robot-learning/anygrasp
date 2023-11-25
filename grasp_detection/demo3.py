@@ -11,7 +11,7 @@ from matplotlib import pyplot as plt
 
 from gsnet import AnyGrasp
 from graspnetAPI import GraspGroup
-from utils.utils import get_bounding_box, show_mask, sam_segment, visualize_cloud_grippers
+from utils.utils import get_bounding_box, show_mask, sam_segment, visualize_cloud_geometries
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--checkpoint_path', required=True, help='Model checkpoint path')
@@ -22,8 +22,8 @@ parser.add_argument('--top_down_grasp', action='store_true', help='Output top-do
 parser.add_argument('--debug', action='store_true', help='Enable visualization')
 parser.add_argument('--open_communication', action='store_true', help='Use image transferred from the robot')
 parser.add_argument('--crop', action='store_true', help='Passing cropped image to anygrasp')
-parser.add_argument('--environment', default = '/data/pick_and_place_exps/Sofa2', help='Environment name')
-parser.add_argument('--method', default = 'usa', help='navigation method name')
+parser.add_argument('--environment', default = '/data/pick_and_place_exps/Leo Bedroom', help='Environment name')
+parser.add_argument('--method', default = 'voxel map', help='navigation method name')
 cfgs = parser.parse_args()
 cfgs.max_gripper_width = max(0, min(0.1, cfgs.max_gripper_width))
 
@@ -177,11 +177,13 @@ def demo():
                 seg_mask = np.array(masks[0])
                 print(seg_mask)
                 plt.figure(figsize=(10, 10))
-                plt.imshow(image)
+                # plt.imshow(image)
                 show_mask(seg_mask, plt.gca())
+                # mask_img.save(cfgs.environment + "/" + text + "/anygrasp/" + cfgs.method +  "/placing_segmentation.jpg")
                 # show_box(input_box, plt.gca())
                 plt.axis('off')
-                plt.show()
+                plt.savefig(cfgs.environment + "/" + text + "/anygrasp/" + cfgs.method +  "/placing_segmentation.jpg")
+                # plt.show()
                 print(points_x.shape)
 
                 flat_x, flat_y, flat_z = points_x.reshape(-1), -points_y.reshape(-1), -points_z.reshape(-1)
@@ -236,14 +238,14 @@ def demo():
                 pcd2.colors = o3d.utility.Vector3dVector(colors)
                 
                 
-                coordinate_frame1 = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.2, origin=[0, 0, 0])
-                coordinate_frame2 = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.2, origin=[0, 0, 0])
+                # coordinate_frame1 = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.2, origin=[0, 0, 0])
+                # coordinate_frame2 = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.2, origin=[0, 0, 0])
                 # o3d.visualizer.add_geometry(coordinate_frame)
-                o3d.visualization.draw_geometries([pcd1, coordinate_frame1])
-                o3d.visualization.draw_geometries([pcd2, coordinate_frame2])
+                # o3d.visualization.draw_geometries([pcd1, coordinate_frame1])
+                # o3d.visualization.draw_geometries([pcd2, coordinate_frame2])
 
-                sampled_indices = np.random.choice(filtered_indices, size=500, replace=False)
-                x_margin, y_margin, z_margin = 0.15, 0.02, 0.15
+                sampled_indices = np.random.choice(filtered_indices, size=200, replace=False)
+                x_margin, y_margin, z_margin = 0.35, 0.04, 0.35
                 max_sum = 0
                 area_ind = []
                 for ind in sampled_indices:
@@ -277,7 +279,9 @@ def demo():
                         cylinder.paint_uniform_color([1, 0, 0])
                     geometries.append(cylinder)
                 
-                o3d.visualization.draw_geometries([pcd2, coordinate_frame2, *geometries])
+                # o3d.visualization.draw_geometries([pcd2, coordinate_frame2, *geometries])
+                visualize_cloud_geometries(pcd2, geometries, 
+                                            save_file = cfgs.environment + "/" + text + "/anygrasp/" + cfgs.method + "/placing.jpg")
 
                 geometries = []
                 max_ind = sorted_area_ind[0][1]
@@ -285,19 +289,19 @@ def demo():
                 point[1] += 0.2
 
                 transformed_point = cam_to_3d_rot @ point
-                print(transformed_point)
-                cylinder = o3d.geometry.TriangleMesh.create_cylinder(radius = 0.05, height=0.04)
-                cylinder.translate(transformed_point)
-                cylinder.rotate(cylinder_rot) 
-                cylinder.paint_uniform_color([1, 0, 0])
-                geometries.append(cylinder)
-                o3d.visualization.draw_geometries([pcd1, coordinate_frame1, *geometries])
+                # print(transformed_point)
+                # cylinder = o3d.geometry.TriangleMesh.create_cylinder(radius = 0.05, height=0.04)
+                # cylinder.translate(transformed_point)
+                # cylinder.rotate(cylinder_rot) 
+                # cylinder.paint_uniform_color([1, 0, 0])
+                # geometries.append(cylinder)
+                # o3d.visualization.draw_geometries([pcd1, coordinate_frame1, *geometries])
 
                 print(f"transformed_point: {transformed_point}")
                 send_msg(np.array(transformed_point, dtype=np.float64), [0], [0, 0, 0])
                 socket.send_string("Now you received the gripper pose, good luck.")
                 # send_msg([2, 1, 2], [0], [0, 0, 0])
-                exit()
+                return 
             else:
                 # remove outlier
                 print(f"max points z - {np.max(points_z)}")
@@ -321,10 +325,10 @@ def demo():
 
                 if len(gg) == 0:
                     print('No Grasp detected after collision detection!')
-                    send_msg([0], [0], [0, 0, 2])
-                    if tries < 10:
+                    if tries < 11:
                         tries = tries + 1
                         print(f"try no: {tries}")
+                        send_msg([0], [0], [0, 0, 2])
                         socket.send_string("No poses, Have to try again")
                         break
                     else :
@@ -371,10 +375,10 @@ def demo():
                     # print(grasp_center, ix, iy, g.depth)
                 if (len(filter_gg) == 0):
                     print("No grasp poses detected for this object try to move the object a little and try again")
-                    send_msg([0], [0], [0, 0, 2])
-                    if tries < 10:
+                    if tries < 11:
                         tries = tries + 1
                         print(f"try no: {tries}")
+                        send_msg([0], [0], [0, 0, 2])
                         socket.send_string("No poses, Have to try again")
                         break
                     else :
@@ -406,9 +410,9 @@ def demo():
         for gripper in filter_grippers:
             gripper.transform(trans_mat)
         
-        visualize_cloud_grippers(cloud, grippers, visualize = True, 
+        visualize_cloud_geometries(cloud, grippers, visualize = True, 
                 save_file = cfgs.environment + "/" + text  + "/anygrasp/" + cfgs.method +  "/poses.jpg")
-        visualize_cloud_grippers(cloud, [filter_grippers[0]], visualize=True, 
+        visualize_cloud_geometries(cloud, [filter_grippers[0]], visualize=True, 
                 save_file = cfgs.environment + "/" + text  + "/anygrasp/" + cfgs.method + "/best_pose.jpg")
     
     send_msg(filter_gg[0].translation, filter_gg[0].rotation_matrix, [filter_gg[0].depth, crop_flag, 0])
