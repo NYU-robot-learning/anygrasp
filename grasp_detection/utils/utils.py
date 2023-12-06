@@ -1,12 +1,13 @@
 import torch
 import numpy as np
-from PIL import ImageDraw
+from PIL import ImageDraw, Image
 import copy
 from matplotlib import pyplot as plt
 import open3d as o3d
 
 from transformers import OwlViTProcessor, OwlViTForObjectDetection
 from segment_anything import sam_model_registry, SamPredictor
+from lang_sam import LangSAM
 
 def get_bounding_box(image, text, tries, save_file):
     processor = OwlViTProcessor.from_pretrained("google/owlvit-base-patch32")
@@ -46,10 +47,21 @@ def get_bounding_box(image, text, tries, save_file):
             img_drw.text((box[0], box[1]), str(round(max_score.item(), 3)), fill="red")
         else:
             img_drw.rectangle([(box[0], box[1]), (box[2], box[3])], outline="white")
-    new_image.save(save_file)
+    image.save(save_file + "/clean_" + str(tries) + ".jpg")
+    new_image.save(save_file + "/owl_vit_detection_" + str(tries) + ".jpg")
     return max_box    
 
-def show_mask(mask, ax, random_color=False):
+def draw_bounding_box(image, bbox, save_file=None):
+    new_image = copy.deepcopy(image)
+    img_drw = ImageDraw.Draw(new_image)
+    img_drw.rectangle([(bbox[0], bbox[1]), (bbox[2], bbox[3])], outline="green")
+
+    if save_file is not None:
+        new_image.save(save_file)
+    # new_image.show()
+    # img_drw.text((max_box[0], max_box[1]), str(round(max_score.item(), 3)), fill="green")
+
+def show_mask(mask, ax=None, random_color=False):
     if random_color:
         color = np.concatenate([np.random.random(3), np.array([0.6])], axis=0)
     else:
@@ -57,6 +69,18 @@ def show_mask(mask, ax, random_color=False):
     h, w = mask.shape[-2:]
     mask_image = mask.reshape(h, w, 1) * color.reshape(1, 1, -1)
     ax.imshow(mask_image)
+    # return mask_image
+
+def draw_seg_mask(image, seg_mask, save_file=None):
+    alpha = np.where(seg_mask > 0, 128, 0).astype(np.uint8)
+
+    image_pil = copy.deepcopy(image)
+    alpha_pil = Image.fromarray(alpha)
+    image_pil.putalpha(alpha_pil)
+
+    if save_file is not None:
+        image_pil.save(save_file)
+
 
 def show_masks_on_image(raw_image, masks, scores):
     if len(masks.shape) == 4:
@@ -74,6 +98,13 @@ def show_masks_on_image(raw_image, masks, scores):
     #   axes[i].title.set_text(f"Mask {i+1}, Score: {score.item():.3f}")
       axes[i].axis("off")
     plt.show()
+
+def lang_sam_segment(image, query):
+    model = LangSAM()
+    masks, boxes, phrases, logits = model.predict(image, query)
+    # print(f"lang sam masks - {masks}")
+    # print(f"lang sam boxes - {boxes.shape}")
+    return masks, boxes
 
 def sam_segment(image, bounding_box):
     """
@@ -124,7 +155,7 @@ def color_grippers(grippers, max_score, min_score):
 
     return grippers
 
-def visualize_cloud_grippers(cloud, grippers, translation = None, rotation = None, visualize = True, save_file = None):
+def visualize_cloud_geometries(cloud, geometries, translation = None, rotation = None, visualize = True, save_file = None):
     """
         cloud       : Point cloud of points
         grippers    : list of grippers of form graspnetAPI grasps
@@ -135,15 +166,15 @@ def visualize_cloud_grippers(cloud, grippers, translation = None, rotation = Non
     coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.2, origin=[0, 0, 0])
     if translation is not None:
         coordinate_frame1 = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.2, origin=[0, 0, 0])
-        print(grippers[0])
+        # print(grippers[0])
         translation[2] = -translation[2]
         coordinate_frame1.translate(translation)
         coordinate_frame1.rotate(rotation)
 
     visualizer = o3d.visualization.Visualizer()
     visualizer.create_window(visible=visualize)
-    for gripper in grippers:
-        visualizer.add_geometry(gripper)
+    for geometry in geometries:
+        visualizer.add_geometry(geometry)
     visualizer.add_geometry(cloud)
     if translation is not None:
         visualizer.add_geometry(coordinate_frame1)
