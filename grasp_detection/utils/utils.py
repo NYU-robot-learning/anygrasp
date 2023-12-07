@@ -113,7 +113,7 @@ def sam_segment(image, bounding_box):
             bounding_box : np.array of [top_left_x, top_left_y, bottom_right_x, bottom_right_y]
 
         Outputs
-            masks : N * H * W, N -> NO.of masks
+            masks : N * H * W, N -> No.of masks
     """
     sam_checkpoint = "sam_vit_h_4b8939.pth"
     model_type = "vit_h"
