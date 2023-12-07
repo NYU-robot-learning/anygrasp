@@ -129,13 +129,13 @@ def demo():
         print(bbox)
         draw_bounding_box(image, bbox, save_file=cfgs.environment + "/" + text + "/anygrasp/" + cfgs.method + "/lseg_detection_" + str(tries) + ".jpg")
         # draw_seg_mask(image, seg_mask, save_file=cfgs.environment + "/" + text + "/anygrasp/" + cfgs.method + "/lseg_segmentation_" + str(tries) + ".png")
-        plt.figure(figsize=(10, 10))
-        plt.imshow(image)
-        show_mask(seg_mask, plt.gca())
-        # plt.axis('off')
-        # plt.show()
-        plt.savefig(cfgs.environment + "/" + text + "/anygrasp/" + cfgs.method + "/lseg_segmentation_" + str(tries) + ".jpg")
-        plt.close()
+        # plt.figure(figsize=(10, 10))
+        # plt.imshow(image)
+        # show_mask(seg_mask, plt.gca())
+        # # plt.axis('off')
+        # # plt.show()
+        # plt.savefig(cfgs.environment + "/" + text + "/anygrasp/" + cfgs.method + "/lseg_segmentation_" + str(tries) + ".jpg")
+        # plt.close()
         # exit()
         
         print(crop_x_min, crop_y_min, crop_x_max, crop_y_max)
@@ -154,23 +154,13 @@ def demo():
 
         if(tries == 1):
             send_msg([-x_dis], [-tilt], [0, 0, 1])
-            # print(socket.recv_string())
-            # send_array(socket, np.array([x_dis]))
-            # print(socket.recv_string())
-            # send_array(socket, np.array([-tilt]))
-            # print(socket.recv_string())
-            # send_array(socket, np.array([0, 0, 1]))
-            # print(socket.recv_string())
             socket.send_string("Now you received the base and haed trans, good luck.")
             tries += 1
-            # if mode == "place":
-            #     crop_flag = True
             continue
         
         while flag:
             # get point cloud
             if crop_flag:
-                # x_min, y_min, x_max, y_max = max(crop_x_min - 50, 0), max(crop_y_min - 50, 0), min(crop_x_max+50, 480), min(crop_y_max+20, 640)
                 x_min, y_min, x_max, y_max = crop_x_min, crop_y_min, crop_x_max, crop_y_max
                 xmap, ymap = np.arange(x_min, x_max+1), np.arange(y_min, y_max+1)
                 print(colors.shape, depths.shape)
