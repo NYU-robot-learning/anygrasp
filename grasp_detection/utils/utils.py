@@ -3,6 +3,8 @@ import numpy as np
 from PIL import ImageDraw, Image
 import copy
 from matplotlib import pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 import open3d as o3d
 
 from transformers import OwlViTProcessor, OwlViTForObjectDetection
@@ -194,3 +196,81 @@ def visualize_cloud_geometries(cloud, geometries, translation = None, rotation =
         visualizer.run()
     else:
         visualizer.destroy_window()    
+    
+def get_cuboid_vertices_and_edges(center, margins):
+    hx, hy, hz = margins[0]/2, margins[1]/2, margins[2]/2
+
+    # Define the vertices of the cuboid
+    vertices = [
+        [center[0] - hx, center[1] - hy, center[2] - hz],
+        [center[0] + hx, center[1] - hy, center[2] - hz],
+        [center[0] + hx, center[1] + hy, center[2] - hz],
+        [center[0] - hx, center[1] + hy, center[2] - hz],
+        [center[0] - hx, center[1] - hy, center[2] + hz],
+        [center[0] + hx, center[1] - hy, center[2] + hz],
+        [center[0] + hx, center[1] + hy, center[2] + hz],
+        [center[0] - hx, center[1] + hy, center[2] + hz]
+    ]
+
+    # Define the edges of the cuboid
+    edges = [
+        [vertices[0], vertices[1], vertices[2], vertices[3], vertices[0]],
+        [vertices[4], vertices[5], vertices[6], vertices[7], vertices[4]],
+        [vertices[0], vertices[4]],
+        [vertices[1], vertices[5]],
+        [vertices[2], vertices[6]],
+        [vertices[3], vertices[7]]
+    ]
+
+    return vertices, edges
+
+def matplotlib_3dplot(points, colors, cuboid = False, center=None, margins=None):
+    px = points[:, 0]
+    py = -points[:, 2]
+    pz = points[:, 1]
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.scatter(px, py, pz, c=colors, marker='o')
+    if cuboid:
+        vertices, edges = get_cuboid_vertices_and_edges(center, margins)
+        ax.add_collection3d(Poly3DCollection(edges, facecolors='cyan', linewidths=1, edgecolors='r', alpha=0.1))
+
+
+    # Set labels for the axes
+    ax.set_xlabel('X Axis')
+    ax.set_ylabel('Y Axis')
+    ax.set_zlabel('Z Axis')
+
+    # Show the plot
+    plt.show()
+
+def matplotlib_2dplot(px, py, title, separate=False, hpx = None, hpy=None):
+    py = -py
+    if (separate):
+        hpy = -hpy
+        n = px.shape[0]
+        ys = [hpy for i in range(n)]
+        xs = [hpx for i in range(n)]
+        plt.scatter(px, ys, marker='x', color='limegreen', s = 30, linestyle='-', label = 'X co-ordinates')
+        plt.scatter(xs, py, marker='x', color='violet', s = 30, linestyle='-', label = 'Z co-ordinates')
+        plt.scatter(hpx, hpy, marker="x", color = 'red', s = 60, linestyle='-', label = 'Median X and Median Z')
+    plt.scatter(px, py, marker='x', color='black')        
+        
+
+    # Set labels for the axes
+    plt.xlabel('X Axis')
+    plt.ylabel('Z Axis')
+
+    # ticks_x = np.linspace(ax.get_xlim()[0], ax.get_xlim()[1], 5)
+    # ticks_y = np.linspace(ax.get_ylim()[0], ax.get_ylim()[1], 5)
+    
+    # Set plot title
+    plt.title(title)
+
+    # Add a legend
+    plt.legend()
+
+    # Show the plot
+    plt.show()
+

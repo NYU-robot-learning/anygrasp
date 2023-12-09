@@ -11,7 +11,7 @@ from matplotlib import pyplot as plt
 
 from gsnet import AnyGrasp
 from graspnetAPI import GraspGroup
-from utils.utils import get_bounding_box, show_mask, sam_segment, visualize_cloud_geometries, lang_sam_segment, draw_bounding_box, draw_seg_mask
+from utils.utils import get_bounding_box, show_mask, sam_segment, visualize_cloud_geometries, lang_sam_segment, draw_bounding_box, draw_seg_mask, matplotlib_3dplot, matplotlib_2dplot
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--checkpoint_path', required=True, help='Model checkpoint path')
@@ -21,9 +21,10 @@ parser.add_argument('--port', type=int, default = 5556, help='port')
 parser.add_argument('--top_down_grasp', action='store_true', help='Output top-down grasps')
 parser.add_argument('--debug', action='store_true', help='Enable visualization')
 parser.add_argument('--open_communication', action='store_true', help='Use image transferred from the robot')
+parser.add_argument('--placing_method', choices=["max", "median", "projected_median"], default="projected_median", help='placing Method')
 parser.add_argument('--crop', action='store_true', help='Passing cropped image to anygrasp')
-parser.add_argument('--environment', default = '/data/pick_and_drop_exps/Pranav Bedroom', help='Environment name')
-parser.add_argument('--method', default = 'voxel map', help='navigation method name')
+parser.add_argument('--environment', default = '/data/pick_and_drop_exps/placing_experiments', help='Environment name')
+parser.add_argument('--method', default = 'projected_median', help='navigation method name')
 cfgs = parser.parse_args()
 cfgs.max_gripper_width = max(0, min(0.1, cfgs.max_gripper_width))
 
@@ -86,6 +87,7 @@ def demo():
     tries = 1
     crop_flag = cfgs.crop
     flag = True
+    cfgs.method = cfgs.placing_method
     while tries > 0:
         torch.cuda.empty_cache()
         colors = recv_array(socket)
@@ -108,6 +110,7 @@ def demo():
         mode = socket.recv_string()
         print(f"mode - {mode}")
         socket.send_string("Mode received")
+        # text = "table"
         if not os.path.exists(cfgs.environment + "/" + text + "/anygrasp/" + cfgs.method):
             os.makedirs(cfgs.environment + "/" + text + "/anygrasp/" + cfgs.method)
         # data_dir = "./example_data/"
@@ -116,8 +119,7 @@ def demo():
         # colors = colors / 255.0
         # depths = np.array(Image.open(os.path.join(data_dir, 'peiqi_test_depth21.png')))
         # fx, fy, cx, cy, scale = 306, 306, 118, 211, 0.001
-        # text = "bottle"
-        # mode = "pick"
+        # mode = "place"
 
         [crop_x_min, crop_y_min, crop_x_max, crop_y_max] = get_bounding_box(image, text, tries,
                                             save_file=cfgs.environment + "/" + text + "/anygrasp/" + cfgs.method)
@@ -183,15 +185,15 @@ def demo():
             if mode == "place":
                 print("placing mode")
                 masks = sam_segment(np.array(image), np.array([crop_x_min, crop_y_min, crop_x_max, crop_y_max]))
-                seg_mask = np.array(masks[0])
+                # seg_mask = np.array(masks[0])
                 print(seg_mask)
-                plt.figure(figsize=(10, 10))
-                plt.imshow(image)
-                show_mask(seg_mask, plt.gca())
+                # plt.figure(figsize=(10, 10))
+                # plt.imshow(image)
+                # show_mask(seg_mask, plt.gca())
                 # mask_img.save(cfgs.environment + "/" + text + "/anygrasp/" + cfgs.method +  "/placing_segmentation.jpg")
                 # show_box(input_box, plt.gca())
-                plt.axis('off')
-                plt.savefig(cfgs.environment + "/" + text + "/anygrasp/" + cfgs.method +  "/placing_segmentation.jpg")
+                # plt.axis('off')
+                # plt.savefig(cfgs.environment + "/" + text + "/anygrasp/" + cfgs.method +  "/placing_sam_segmentation.jpg")
                 # plt.show()
                 print(points_x.shape)
 
@@ -248,36 +250,48 @@ def demo():
                 # coordinate_frame1 = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.2, origin=[0, 0, 0])
                 # coordinate_frame2 = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.2, origin=[0, 0, 0])
                 # # o3d.visualizer.add_geometry(coordinate_frame)
+                # matplotlib_3dplot(points1, colors)
+                matplotlib_3dplot(transformed_points, colors)
+                # exit()
                 # o3d.visualization.draw_geometries([pcd1, coordinate_frame1])
                 # o3d.visualization.draw_geometries([pcd2, coordinate_frame2])
 
                 # Looking for hallow objects
 
                 # Mean
-                # threshold = 0.13
-                # max_x, max_z, min_x, min_z = np.max(transformed_x), np.max(transformed_z), np.min(transformed_x), np.min(transformed_z)
-                # avg_x, avg_z = (max_x + min_x) / 2, (max_z + min_z)/2
+                if (cfgs.placing_method == "max"):
+                    # threshold = 0.13
+                    max_x, max_z, min_x, min_z = np.max(transformed_x), np.max(transformed_z), np.min(transformed_x), np.min(transformed_z)
+                    px, pz = (max_x + min_x) / 2, (max_z + min_z)/2
                 # print(f"top surface max min x, z's{max_x}, {max_z}, {min_x}, {min_z}")
                 
                 # Median
-                # px, pz = np.median(transformed_x), np.median(transformed_z)
+                if (cfgs.placing_method == "median"):
+                    px, pz = np.median(transformed_x), np.median(transformed_z)
 
                 # Projected Median
-                xz = np.stack([transformed_x*100, transformed_z*100], axis = -1).astype(int)
-                unique_xz = np.unique(xz, axis = 0)
-                unique_xz_x, unique_xz_z = unique_xz[:, 0], unique_xz[:, 1]
-                px, pz = np.median(unique_xz_x)/100.0, np.median(unique_xz_z)/100.0
+                if cfgs.placing_method == "projected_median":
+                    xz = np.stack([transformed_x*100, transformed_z*100], axis = -1).astype(int)
+                    unique_xz = np.unique(xz, axis = 0)
+                    unique_xz_x, unique_xz_z = unique_xz[:, 0], unique_xz[:, 1]
+                    # matplotlib_2dplot((unique_xz_x/100.0), (unique_xz_z/100.0), "Project points on XZ Plane")
+                    px, pz = np.median(unique_xz_x)/100.0, np.median(unique_xz_z)/100.0
+                    print(px, pz)
+                    matplotlib_2dplot((unique_xz_x/100.0), (unique_xz_z/100.0), "X and Z Co-ordinates ", separate = True, hpx = px, hpy = pz)
 
                 x_margin, z_margin = 0.1, 0
                 x_mask = ((transformed_x < (px + x_margin)) & (transformed_x > (px - x_margin)))
                 y_mask = ((transformed_y < 0) & (transformed_y > -1.1))
                 z_mask = ((transformed_z < 0) & (transformed_z > (pz - z_margin)))
+                # matplotlib_3dplot(points1, colors, cuboid=True, center=[px, -0.65, (pz - z_margin)/2], margins=[2*x_margin, -1.1, (pz - z_margin)])
+                # exit()
                 mask = x_mask & y_mask & z_mask
                 py = np.max(transformed_y[mask])
                 point = np.array([px, py, pz])
                 
+                
                 geometries = []
-                cylinder = o3d.geometry.TriangleMesh.create_cylinder(radius = 0.1, height=0.04)
+                cylinder = o3d.geometry.TriangleMesh.create_cylinder(radius = 0.05, height=0.04)
                 cylinder_rot = np.array([[1, 0, 0], [0, 0, -1], [0, 1, 0]])
                 cylinder.rotate(cylinder_rot) 
                 cylinder.translate(point)

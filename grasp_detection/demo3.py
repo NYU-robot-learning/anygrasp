@@ -22,8 +22,8 @@ parser.add_argument('--top_down_grasp', action='store_true', help='Output top-do
 parser.add_argument('--debug', action='store_true', help='Enable visualization')
 parser.add_argument('--open_communication', action='store_true', help='Use image transferred from the robot')
 parser.add_argument('--crop', action='store_true', help='Passing cropped image to anygrasp')
-parser.add_argument('--environment', default = '/data/pick_and_place_exps/Leo Bedroom', help='Environment name')
-parser.add_argument('--method', default = 'voxel map', help='navigation method name')
+parser.add_argument('--environment', default = '/data/pick_and_drop_exps/placing_experiments', help='Environment name')
+parser.add_argument('--method', default = 'prev_method', help='navigation method name')
 cfgs = parser.parse_args()
 cfgs.max_gripper_width = max(0, min(0.1, cfgs.max_gripper_width))
 
@@ -118,7 +118,7 @@ def demo():
         # mode = "place"
         
         [crop_x_min, crop_y_min, crop_x_max, crop_y_max] = get_bounding_box(image, text, tries,
-                                            save_file=cfgs.environment + "/" + text + "/anygrasp/" + cfgs.method +  "/owl_vit_bboxes.jpg")
+                                            save_file=cfgs.environment + "/" + text + "/anygrasp/" + cfgs.method)
         print(crop_x_min, crop_y_min, crop_x_max, crop_y_max)
 
         bbox_center = [int((crop_x_min + crop_x_max)/2), int((crop_y_min + crop_y_max)/2)]
