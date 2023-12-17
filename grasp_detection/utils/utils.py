@@ -1,3 +1,5 @@
+from typing import List, Type
+
 import torch
 import numpy as np
 from PIL import ImageDraw, Image
@@ -5,9 +7,28 @@ import copy
 from matplotlib import pyplot as plt
 import open3d as o3d
 
+
+from camera import CameraParameters
 from transformers import OwlViTProcessor, OwlViTForObjectDetection
 from segment_anything import sam_model_registry, SamPredictor
 from lang_sam import LangSAM
+
+def get_3d_points(cam: CameraParameters):
+
+    xmap, ymap = np.arange(cam.depths.shape[1]), np.arange(cam.depths.shape[0])
+    xmap, ymap = np.meshgrid(xmap, ymap)
+    print(xmap.shape)
+    print(cam.depths.shape)
+    print(cam.colors.shape)
+    points_z = cam.depths
+    points_x = (xmap - cam.cx) / cam.fx * points_z
+    points_y = (ymap - cam.cy) / cam.fy * points_z
+
+    print(f"x - [{np.min(points_x)}. {np.max(points_x)}]")
+    print(f"y - [{np.min(points_y)}. {np.max(points_y)}]")
+    print(f"z - [{np.min(points_z)}. {np.max(points_z)}]")
+
+    return np.stack((points_x, points_y, points_z), axis=-1)
 
 def get_bounding_box(image, text, tries, save_file):
     processor = OwlViTProcessor.from_pretrained("google/owlvit-base-patch32")
