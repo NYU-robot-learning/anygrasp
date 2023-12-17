@@ -26,4 +26,4 @@ class LangSAMProcessor(ImageProcessor):
         if visualize_box:
             self.draw_bounding_box(image, bbox, save_file)
 
-        return masks, bbox
+        return seg_mask, bbox
