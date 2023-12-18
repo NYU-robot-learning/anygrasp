@@ -1,8 +1,8 @@
-from dataclass import dataclass
-from typing import float, Type
+from dataclasses import dataclass
+from typing import Type
 
 import numpy as np
-from PiL import Image
+from PIL import Image
 
 @dataclass
 class CameraParmaters:
