@@ -62,13 +62,9 @@ class ObjectHandler():
                                    colors,
                                    depths)
 
-
     def manipulate(self):
         """
             Wrapper for grasping and placing
-
-            Incase of failure we try multiple times
-            Try 1 -> Capture Image and center the robot
         """
         
         tries = 1 
@@ -320,5 +316,3 @@ class ObjectHandler():
             return False
 
         return True
-        
-                
