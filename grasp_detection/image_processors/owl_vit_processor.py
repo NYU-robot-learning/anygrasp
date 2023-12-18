@@ -4,7 +4,7 @@ import torch
 import numpy as np
 from PIL import Image
 
-from image_processor import ImageProcessor
+from image_processors.image_processor import ImageProcessor
 from transformers import OwlViTProcessor, OwlViTForObjectDetection
 
 class OwlVITProcessor(ImageProcessor):

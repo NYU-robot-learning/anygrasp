@@ -1,9 +1,9 @@
 from typing import List, Type, Tuple
 
-from PiL import Image
+from PIL import Image
 import numpy as np
 
-from image_processor import ImageProcessor
+from image_processors.image_processor import ImageProcessor
 from lang_sam import LangSAM
 
 class LangSAMProcessor(ImageProcessor):

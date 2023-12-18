@@ -8,7 +8,7 @@ from matplotlib import pyplot as plt
 import open3d as o3d
 
 
-from camera import CameraParameters
+from utils.camera import CameraParameters
 from transformers import OwlViTProcessor, OwlViTForObjectDetection
 from segment_anything import sam_model_registry, SamPredictor
 from lang_sam import LangSAM

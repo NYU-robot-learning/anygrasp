@@ -1,9 +1,6 @@
 import argparse
-import os
-import numpy as np
-import sys
-print(sys.path)
-# from manipulation import ObjectHandler
+
+from manipulation import ObjectHandler
 parser = argparse.ArgumentParser()
 parser.add_argument('--checkpoint_path', required=True, help='Model checkpoint path')
 parser.add_argument('--max_gripper_width', type=float, default=0.1, help='Maximum gripper width (<=0.1m)')
@@ -19,9 +16,9 @@ cfgs = parser.parse_args()
 cfgs.max_gripper_width = max(0, min(0.1, cfgs.max_gripper_width))
 
 def main():
-    print()
-    # object_handler = ObjectHandler(cfgs)
-    # object_handler.manipulate()
+    # print()
+    object_handler = ObjectHandler(cfgs)
+    object_handler.manipulate()
 
 if __name__ == "__main__":
     main()

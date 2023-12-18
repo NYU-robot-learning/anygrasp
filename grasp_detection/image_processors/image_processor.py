@@ -35,7 +35,7 @@ class ImageProcessor(ABC):
         self,
         image: Type[Image.Image],
         bboxes: List[int],
-        scores: list[int],
+        scores: List[int],
         max_box_ind: int = -1,
         save_file: str = None
     ) -> None:

@@ -9,11 +9,10 @@ from PIL import Image, ImageDraw
 
 from gsnet import AnyGrasp
 from graspnetAPI import GraspGroup
-from socket import ZmqSocket
-from utils import get_3d_points, visualize_cloud_geometries
-from camera import CameraParameters
-from image_processor import OwlVITProcessor, LangSAMProcessor, SamProcessor
-
+from utils.zmq_socket import ZmqSocket
+from utils.utils import get_3d_points, visualize_cloud_geometries
+from utils.camera import CameraParameters
+from image_processors import OwlVITProcessor, LangSAMProcessor, SamProcessor
 
 class ObjectHandler():
     def __init__(

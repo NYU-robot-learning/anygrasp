@@ -5,7 +5,7 @@ import numpy as np
 from PIL import Image
 
 @dataclass
-class CameraParmaters:
+class CameraParameters:
     fx: float
     fy: float
     cx: float

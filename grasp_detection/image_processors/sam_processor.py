@@ -1,9 +1,9 @@
 from typing import List, Type
 
-from PiL import Image
+from PIL import Image
 import numpy as np
 
-from image_processor import ImageProcessor
+from image_processors.image_processor import ImageProcessor
 from segment_anything import sam_model_registry, SamPredictor
 
 class SamProcessor(ImageProcessor):
