@@ -1,12 +1,12 @@
 **/__pycache__/**
 **/*.egg-info/
 *.o
-*.so
+gsnet.so
 *.egg
 .DS_Store
 .TimeRecord
 license
-/grasp_detection/log/*
-/grasp_detection/example_data/*
+/src/checkpoints/*
+/src/example_data/*
 *.png
 *.pth
