@@ -149,17 +149,6 @@ class ObjectHandler():
         points: np.ndarray,
         save_dir: str
     ) -> bool:
-        print("placing mode")
-        print(seg_mask)
-        # plt.figure(figsize=(10, 10))
-        # plt.imshow(image)
-        # show_mask(seg_mask, plt.gca())
-        # # mask_img.save(cfgs.environment + "/" + text + "/anygrasp/" + cfgs.method +  "/placing_segmentation.jpg")
-        # # show_box(input_box, plt.gca())
-        # plt.axis('off')
-        # plt.savefig(cfgs.environment + "/" + text + "/anygrasp/" + cfgs.method +  "/placing_segmentation.jpg")
-        # # plt.show()
-        # print(points_x.shape)
 
         points_x, points_y, points_z = points[:, 0], points[:, 1], points[:, 2]
         flat_x, flat_y, flat_z = points_x.reshape(-1), -points_y.reshape(-1), -points_z.reshape(-1)
@@ -211,23 +200,6 @@ class ObjectHandler():
         pcd2 = o3d.geometry.PointCloud()
         pcd2.points = o3d.utility.Vector3dVector(transformed_points)
         pcd2.colors = o3d.utility.Vector3dVector(colors)
-        
-        # coordinate_frame1 = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.2, origin=[0, 0, 0])
-        # coordinate_frame2 = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.2, origin=[0, 0, 0])
-        # # o3d.visualizer.add_geometry(coordinate_frame)
-        # o3d.visualization.draw_geometries([pcd1, coordinate_frame1])
-        # o3d.visualization.draw_geometries([pcd2, coordinate_frame2])
-
-        # Looking for hallow objects
-
-        # Mean
-        # threshold = 0.13
-        # max_x, max_z, min_x, min_z = np.max(transformed_x), np.max(transformed_z), np.min(transformed_x), np.min(transformed_z)
-        # avg_x, avg_z = (max_x + min_x) / 2, (max_z + min_z)/2
-        # print(f"top surface max min x, z's{max_x}, {max_z}, {min_x}, {min_z}")
-        
-        # Median
-        # px, pz = np.median(transformed_x), np.median(transformed_z)
 
         # Projected Median
         xz = np.stack([transformed_x*100, transformed_z*100], axis = -1).astype(int)
