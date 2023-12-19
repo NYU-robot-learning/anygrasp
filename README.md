@@ -37,7 +37,7 @@ Due to the IP issue, currently only the SDK library file of AnyGrasp is availabl
     cp ../license_registration/lib_cxx_versions/lib_cxx.cpython-36m-x86_64-linux-gnu.so lib_cxx.so
 ```
 
-2. Unzip your license and put the folder here as `license`. Refer to [license_registration/README.md](../license_registration/README.md) if you have not applied for license.
+2. Unzip your license and put the folder here as `license`. Refer to [license_registration/README.md](./license_registration/README.md) if you have not applied for license.
 
 3. Put model weights under ``checkpoints/``.
 
