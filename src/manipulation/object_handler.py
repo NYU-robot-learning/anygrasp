@@ -1,12 +1,13 @@
 import os 
 import math
-from typing import List
+import copy
 
 # import torch
 import numpy as np
 import open3d as o3d
 from PIL import Image, ImageDraw
 
+from utils.types import Bbox
 from gsnet import AnyGrasp
 from graspnetAPI import GraspGroup
 from utils.zmq_socket import ZmqSocket
@@ -27,33 +28,45 @@ class ObjectHandler():
 
         self.owl_vit = OwlVITProcessor()
         self.sam = SamProcessor()
-        self.lang_sam = LangSAMProcessor
+        self.lang_sam = LangSAMProcessor()
 
     def receive_input(self):
         # Reading color array
-        colors = self.socket.recv_array()
-        self.socket.send_string("RGB received")
+        # colors = self.socket.recv_array()
+        # self.socket.send_data("RGB received")
 
-        # Depth data
-        depths = self.socket.recv_array()
-        self.socket.send_string("depth received")
+        # # Depth data
+        # depths = self.socket.recv_array()
+        # self.socket.send_data("depth received")
 
-        # Camera Intrinsics
-        fx, fy, cx, cy, head_tilt = self.socket.recv_array()
-        self.socket.send_string("intrinsics received")
+        # # Camera Intrinsics
+        # fx, fy, cx, cy, head_tilt = self.socket.recv_array()
+        # self.socket.send_data("intrinsics received")
 
-        # Object query
-        self.query = self.socket.recv_string()
-        self.socket.send_string("text query received")
-        print(f"text - {self.query}")
+        # # Object query
+        # self.query = self.socket.recv_string()
+        # self.socket.send_data("text query received")
+        # print(f"text - {self.query}")
 
-        # action -> ["pick", "place"]
-        self.action = self.socket.recv_string()
-        self.socket.send_string("Mode received")
-        print(f"mode - {self.action}")
+        # # action -> ["pick", "place"]
+        # self.action = self.socket.recv_string()
+        # self.socket.send_data("Mode received")
+        # print(f"mode - {self.action}")
+        # print(self.socket.recv_string())
+
+        head_tilt= -45
+        data_dir = "./example_data/"
+        colors = np.array(Image.open(os.path.join(data_dir, 'peiqi_test_rgb21.png')))
+        image = Image.open(os.path.join(data_dir, 'peiqi_test_rgb21.png'))
+        # colors = colors / 255.0
+        depths = np.array(Image.open(os.path.join(data_dir, 'peiqi_test_depth21.png')))
+        fx, fy, cx, cy, scale = 306, 306, 118, 211, 0.001
+        self.action = "pick"
+        self.query = "yellow bottle"
+        depths = depths * scale
         
         # Camera Parameters
-        image = Image.fromarray(colors)
+        # image = Image.fromarray(colors)
         colors = colors / 255.0
         head_tilt = head_tilt / 100
         self.cam = CameraParameters(fx, fy, cx, cy,
@@ -70,30 +83,37 @@ class ObjectHandler():
         tries = 1 
         retry = True
         while retry and tries <= 11:
-            action = self.receive_input()
+            self.receive_input()
 
             # Directory for saving visualisations
             self.save_dir = self.cfgs.environment + "/" + self.query + "/anygrasp/" + self.cfgs.method
             if not os.path.exists(self.save_dir):
                 os.makedirs(self.save_dir)
+            self.cam.image.save(self.save_dir + "/clean_" + str(tries) + ".jpg")
 
             # Just for comparing owl_vit vs lang sam this wont be used for further processing, Can be commented if not required
-            bbox =  self.owl_vit.get_bounding_box(self.cam.image, self.query, visualize_box = True,
-                                                save_file=self.cfgs.environment + "/" + \
-                                                self.query + "/anygrasp/" + self.cfgs.method)
+            bbox =  self.owl_vit.detect_obj(self.cam.image, self.query, visualize_box = True,
+                                                bbox_save_filename=self.cfgs.environment + "/" + \
+                                                self.query + "/anygrasp/" + self.cfgs.method + \
+                                                "/owl_vit_detection_" + str(tries) + ".jpg")
 
             # Object Segmentaion Mask
-            seg_mask, bbox = self.lang_sam_segment(self.cam.image, self.query, visualize_box = True,
-                                                save_file = self.cfgs.environment + "/" + self.query + \
+            seg_mask, bbox = self.lang_sam.detect_obj(self.cam.image, self.query, 
+                                                      visualize_box = True, visualize_mask = True,
+                                                      box_filename = self.cfgs.environment + "/" + self.query + \
                                                             "/anygrasp/" + self.cfgs.method + \
-                                                            "/lseg_detection_" + str(tries) + ".jpg"
-                                                )
+                                                            "/lseg_detection_" + str(tries) + ".jpg",
+                                                      mask_filename = self.cfgs.environment + "/" + self.query + \
+                                                            "/anygrasp/" + self.cfgs.method + \
+                                                            "/lseg_segmentation_" + str(tries) + ".jpg")
+
             if bbox is None:
                 print("Didnt detect the object")
                 tries = tries + 1
                 print(f"try no: {tries}")
-                self.socket.send_msg([0], [0], [0, 0, 2])
-                self.socket.send_string("No Objects detected, Have to try again")
+                data_msg = "No Objects detected, Have to try again"
+                # self.socket.send_data([[0], [0], [0, 0, 2], data_msg])
+                # self.socket.send_data("No Objects detected, Have to try again")
 
             bbox_x_min, bbox_y_min, bbox_x_max, bbox_y_max = bbox
             print(bbox)
@@ -104,20 +124,21 @@ class ObjectHandler():
                 tries += 1
                 continue
             
-            points = get_3d_points()
+            points = get_3d_points(self.cam)
 
-            if action == "place":
-                retry = not self.place(points)
+            if self.action == "place":
+                retry = not self.place(points, seg_mask)
             else:
-                retry = not self.pickup(points)
+                retry = not self.pickup(points, seg_mask, bbox)
 
             if retry:
                 tries = tries + 1
                 print(f"try no: {tries}")
-                self.socket.send_msg([0], [0], [0, 0, 2])
-                self.socket.send_string("No poses, Have to try again")
+                data_msg = "No poses, Have to try again"
+                # self.socket.send_data([[0], [0], [0, 0, 2], data_msg])
+                # self.socket.send_data("No poses, Have to try again")
 
-    def center_robot(self, bbox: List[int]):
+    def center_robot(self, bbox: Bbox):
         ''' 
             Center the robots base and camera to face the center of the Object Bounding box
         '''
@@ -125,28 +146,28 @@ class ObjectHandler():
         bbox_x_min, bbox_x_max, bbox_y_min, bbox_y_max = bbox
 
         bbox_center = [int((bbox_x_min + bbox_x_max)/2), int((bbox_y_min + bbox_y_max)/2)]
-        depth_obj = self.depths[bbox_center[1], bbox_center[0]]
-        print(f"{self.query} height and depth: {((bbox_y_max - bbox_y_min) * depth_obj)/self.fy}, {depth_obj}")
+        depth_obj = self.cam.depths[bbox_center[1], bbox_center[0]]
+        print(f"{self.query} height and depth: {((bbox_y_max - bbox_y_min) * depth_obj)/self.cam.fy}, {depth_obj}")
 
         # base movement
-        dis = (bbox_center[0] - self.cx)/self.fx * depth_obj
+        dis = (bbox_center[0] - self.cam.cx)/self.cam.fx * depth_obj
         print(f"d displacement {dis}")
 
         # camera tilt
-        tilt = math.atan((bbox_center[1] - self.cy)/self.fy)
+        tilt = math.atan((bbox_center[1] - self.cam.cy)/self.cam.fy)
         print(f"y tilt {tilt}")
 
-        self.socket.send_msg([-dis], [-tilt], [0, 0, 1])
-        self.socket.send_string("Now you received the base and haed trans, good luck.")
+        data_msg = "Now you received the base and haed trans, good luck."
+        # self.socket.send_data([[-dis], [-tilt], [0, 0, 1], data_msg])
+        # self.socket.send_data("Now you received the base and haed trans, good luck.")
 
     def place(
         self,
-        seg_mask: np.ndarray,
         points: np.ndarray,
-        save_dir: str
+        seg_mask: np.ndarray
     ) -> bool:
 
-        points_x, points_y, points_z = points[:, 0], points[:, 1], points[:, 2]
+        points_x, points_y, points_z = points[:, :, 0], points[:, :, 1], points[:, :, 2]
         flat_x, flat_y, flat_z = points_x.reshape(-1), -points_y.reshape(-1), -points_z.reshape(-1)
 
         # Removing all points whose depth is zero(undetermined)
@@ -179,6 +200,7 @@ class ObjectHandler():
         transformed_y = transformed_points[:, 1]
         transformed_z = transformed_points[:, 2]
         colors = colors[floor_mask]
+        print(f"max and min y {np.min(transformed_y)}, {np.max(transformed_y)}")
         # flattened_seg_mask = seg_mask[floor_mask]
 
         num_points = len(transformed_x)
@@ -197,16 +219,23 @@ class ObjectHandler():
         pcd2.points = o3d.utility.Vector3dVector(transformed_points)
         pcd2.colors = o3d.utility.Vector3dVector(colors)
 
+        coordinate_frame1 = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.2, origin=[0, 0, 0])
+        coordinate_frame2 = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.2, origin=[0, 0, 0])        
+        o3d.visualization.draw_geometries([pcd1, coordinate_frame1])
+        o3d.visualization.draw_geometries([pcd2, coordinate_frame2])
+
         # Projected Median
         xz = np.stack([transformed_x*100, transformed_z*100], axis = -1).astype(int)
         unique_xz = np.unique(xz, axis = 0)
         unique_xz_x, unique_xz_z = unique_xz[:, 0], unique_xz[:, 1]
         px, pz = np.median(unique_xz_x)/100.0, np.median(unique_xz_z)/100.0
+        print(f"projected median {px, pz}")
 
         x_margin, z_margin = 0.1, 0
         x_mask = ((transformed_x < (px + x_margin)) & (transformed_x > (px - x_margin)))
         y_mask = ((transformed_y < 0) & (transformed_y > -1.1))
         z_mask = ((transformed_z < 0) & (transformed_z > (pz - z_margin)))
+        print(f"x y a dn z masks {np.sum(x_mask)}, {np.sum(y_mask)}, {np.sum(z_mask)}")
         mask = x_mask & y_mask & z_mask
         py = np.max(transformed_y[mask])
         point = np.array([px, py, pz])
@@ -227,19 +256,18 @@ class ObjectHandler():
         transformed_point = cam_to_3d_rot @ point
 
         print(f"transformed_point: {transformed_point}")
-        self.socket.send_msg(np.array(transformed_point, dtype=np.float64), [0], [0, 0, 0])
-        self.socket.send_string("Now you received the gripper pose, good luck.")
-    
+        data_msg = "Now you received the gripper pose, good luck."
+        self.socket.send_data([np.array(transformed_point, dtype=np.float64), [0], [0, 0, 0], data_msg])
+        # self.socket.send_data("Now you received the gripper pose, good luck.")
     
     def pickup(
         self,
         points: np.ndarray,
         seg_mask: np.ndarray,
-        bbox: List[int],
-        crop_flag: bool,
-        save_file: str
+        bbox: Bbox,
+        crop_flag: bool = False,
     ):
-        points_x, points_y, points_z = points[:, 0], points[:, 1], points[:, 2]
+        points_x, points_y, points_z = points[:, :, 0], points[:, :, 1], points[:, :, 2]
         
         mask = (points_z > 0) & (points_z < 2)
         points = np.stack([points_x, -points_y, points_z], axis=-1)
@@ -254,6 +282,7 @@ class ObjectHandler():
         lims = [xmin, xmax, ymin, ymax, zmin, zmax]
 
         colors_m = self.cam.colors[mask].astype(np.float32)
+        print(f"colors input shape {colors_m.shape}")
         print(points.min(axis=0), points.max(axis=0))
 
         # get prediction
@@ -265,13 +294,15 @@ class ObjectHandler():
 
         gg = gg.nms().sort_by_score()
         filter_gg = GraspGroup()
-        # print(gg.scores())
+        print(len(gg))
 
         bbox_x_min, bbox_y_min, bbox_x_max, bbox_y_max = bbox
-        H, W = self.cam.image.shape
+        W, H = self.cam.image.size
+        print(f"image height and width {H}, {W}")
         ref_vec = np.array([0, math.cos(self.cam.head_tilt), -math.sin(self.cam.head_tilt)])
         min_score, max_score = 1, -10
-        img_drw = ImageDraw.Draw(self.cam.image)
+        image = copy.deepcopy(self.cam.image)
+        img_drw = ImageDraw.Draw(image)
         img_drw.rectangle([(bbox_x_min, bbox_y_min), (bbox_x_max, bbox_y_max)], outline="red")
         for g in gg:
             grasp_center = g.translation
@@ -315,4 +346,22 @@ class ObjectHandler():
             print("No grasp poses detected for this object try to move the object a little and try again")
             return False
 
+        image.save(self.cfgs.environment + "/" + self.query + "/anygrasp/" + self.cfgs.method +  "/grasp_projections.jpg")
+        filter_gg = filter_gg.nms().sort_by_score()
+
+        if self.cfgs.debug:
+            trans_mat = np.array([[1,0,0,0],[0,1,0,0],[0,0,-1,0],[0,0,0,1]])
+            cloud.transform(trans_mat)
+            grippers = gg.to_open3d_geometry_list()
+            filter_grippers = filter_gg.to_open3d_geometry_list()
+            for gripper in grippers:
+                gripper.transform(trans_mat)
+            for gripper in filter_grippers:
+                gripper.transform(trans_mat)
+            
+            visualize_cloud_geometries(cloud, grippers, visualize = True, 
+                    save_file = self.cfgs.environment + "/" + self.query  + "/anygrasp/" + self.cfgs.method +  "/poses.jpg")
+            visualize_cloud_geometries(cloud, [filter_grippers[0]], visualize=True, 
+                    save_file = self.cfgs.environment + "/" + self.query  + "/anygrasp/" + self.cfgs.method + "/best_pose.jpg")
+    
         return True

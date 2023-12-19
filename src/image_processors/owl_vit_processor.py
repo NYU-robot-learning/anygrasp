@@ -9,6 +9,8 @@ from transformers import OwlViTProcessor, OwlViTForObjectDetection
 
 class OwlVITProcessor(ImageProcessor):
     def __init__(self):
+        super().__init__()
+
         self.processor = OwlViTProcessor.from_pretrained("google/owlvit-base-patch32")
         self.model = OwlViTForObjectDetection.from_pretrained("google/owlvit-base-patch32")
     
@@ -17,7 +19,6 @@ class OwlVITProcessor(ImageProcessor):
         image: Type[Image.Image],
         text: str = None,
         bbox: List[int] = None,
-        save_file: str = None,
         visualize_box: bool = False,
         bbox_save_filename: str = None,
         visualize_boxes: bool = False,

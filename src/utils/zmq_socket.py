@@ -2,6 +2,7 @@ from typing import Optional, List, Union
 
 import zmq
 import numpy as np
+from utils.types import Number
 
 class ZmqSocket:
     def __init__(self, cfgs):
@@ -39,17 +40,29 @@ class ZmqSocket:
 
         return data.reshape(md['shape'])
     
-    def send_msgs(
+    def send_data(
         self,
-        msgs: List[Union[List[float], str]]
+        data: Union[str, Union[List[Number], List[Union[List[Number], str]]]]
     ) -> Optional[bool]:
-        """Send list of messages - list of numbers or a string"""
-        for msg in msgs:
-            if isinstance(msg, list) and all(isinstance(num, float) for num in msg):
-                # if the message is a list of floats
-                data = np.ndarray(msg)
-                self.send_array(data)
-            elif isinstance(msg, str):
-                # if the message 
-                self.socket.send_string(msg)
+        """Send msg - string or list of Numbers or list of list Numbers or strings """
+
+        # After sending anytype of data other than str it waits for the string confirmation from robot
+        if isinstance(data, str):
+            self.socket.send_string(data)
+        elif isinstance(data, list) and all((not isinstance(num, list)) for num in data):
+            data = np.array(data)
+            self.send_array(data)
+            print(self.recv_string())
+        else:
+            for d in data:
+                if isinstance(d, str):
+                    self.socket.send_string(d)
+                else:
+                    print(d)
+                    data = np.array(d)
+                    self.send_array(data)
+                    print(self.recv_string())                    
+    
+    def recv_string(self) -> str:
+        return self.socket.recv_string()
         

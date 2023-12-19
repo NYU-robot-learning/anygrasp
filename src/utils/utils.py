@@ -24,7 +24,7 @@ def get_3d_points(cam: CameraParameters):
     print(f"y - [{np.min(points_y)}. {np.max(points_y)}]")
     print(f"z - [{np.min(points_z)}. {np.max(points_z)}]")
 
-    return np.stack((points_x, points_y, points_z), axis=-1)
+    return np.stack((points_x, points_y, points_z), axis=2)
 
 def show_mask(mask, ax=None, random_color=False):
     if random_color:

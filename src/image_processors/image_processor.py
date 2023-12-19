@@ -4,6 +4,7 @@ import copy
 
 from PIL import Image, ImageDraw
 import numpy as np
+import cv2
 
 class ImageProcessor(ABC):
     def __init__(self):
@@ -52,7 +53,6 @@ class ImageProcessor(ABC):
 
         for box, score, label in zip(bboxes, scores):
             box = [int(i) for i in box.tolist()]
-            # print(f"Detected {text[label]} with confidence {round(score.item(), 3)} at location {box}")
             if (score == max_score):
                 img_drw.rectangle([(box[0], box[1]), (box[2], box[3])], outline="red")
                 img_drw.text((box[0], box[1]), str(round(max_score.item(), 3)), fill="red")
@@ -60,9 +60,24 @@ class ImageProcessor(ABC):
                 img_drw.rectangle([(box[0], box[1]), (box[2], box[3])], outline="white")
         new_image.save(save_file)
 
-    def show_mask_on_image(
+    def draw_mask_on_image(
+        self,
         image: Type[Image.Image],
-        mask: np.ndarray,
-        save_file: str = None,
+        seg_mask: np.ndarray,
+        save_file: str = None
     ) -> None:
-        pass
+        
+        image = np.array(image)
+        image[seg_mask] = image[seg_mask]*0.2
+
+        # overlay mask
+        highlighted_color = [179, 210, 255]
+        overlay_mask = np.zeros_like(image)
+        overlay_mask[seg_mask] = highlighted_color
+        
+        # placing mask over image 
+        alpha = 0.6
+        highlighted_image = cv2.addWeighted(overlay_mask, alpha, image, 1, 0)
+        highlighted_image = cv2.cvtColor(highlighted_image, cv2.COLOR_RGB2BGR)
+
+        cv2.imwrite(save_file, highlighted_image)

@@ -8,7 +8,9 @@ from segment_anything import sam_model_registry, SamPredictor
 
 class SamProcessor(ImageProcessor):
     def __init__(self):
-        sam_checkpoint = "/checkpoints/sam_vit_h_4b8939.pth"
+        super().__init__()
+        
+        sam_checkpoint = "./checkpoints/sam_vit_h_4b8939.pth"
         model_type = "vit_h"
         device = "cuda"
 
