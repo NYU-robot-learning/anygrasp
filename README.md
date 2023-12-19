@@ -16,7 +16,12 @@
     pip install -r requirements.txt
 ```
 
-3. Install ``pointnet2`` module.
+3. Install [langSAM](https://github.com/luca-medeiros/lang-segment-anything).
+```bash
+    pip install -U git+https://github.com/luca-medeiros/lang-segment-anything.git
+```
+
+4. Install ``pointnet2`` module.
 ```bash
     cd pointnet2
     python setup.py install

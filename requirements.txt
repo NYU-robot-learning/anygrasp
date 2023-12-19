@@ -4,3 +4,4 @@ scipy
 tqdm
 graspnetAPI
 open3d
+transformers
