@@ -8,7 +8,7 @@
 ## Installation
 1. Install Minkowski Engine
 ```bash
-    pip install -r requirements.txt
+    pip3 install -U git+https://github.com/NVIDIA/MinkowskiEngine
 ```
 
 2. Install other requirements from Pip.

@@ -32,41 +32,41 @@ class ObjectHandler():
 
     def receive_input(self):
         # Reading color array
-        # colors = self.socket.recv_array()
-        # self.socket.send_data("RGB received")
+        colors = self.socket.recv_array()
+        self.socket.send_data("RGB received")
 
-        # # Depth data
-        # depths = self.socket.recv_array()
-        # self.socket.send_data("depth received")
+        # Depth data
+        depths = self.socket.recv_array()
+        self.socket.send_data("depth received")
 
-        # # Camera Intrinsics
-        # fx, fy, cx, cy, head_tilt = self.socket.recv_array()
-        # self.socket.send_data("intrinsics received")
+        # Camera Intrinsics
+        fx, fy, cx, cy, head_tilt = self.socket.recv_array()
+        self.socket.send_data("intrinsics received")
 
-        # # Object query
-        # self.query = self.socket.recv_string()
-        # self.socket.send_data("text query received")
-        # print(f"text - {self.query}")
+        # Object query
+        self.query = self.socket.recv_string()
+        self.socket.send_data("text query received")
+        print(f"text - {self.query}")
 
-        # # action -> ["pick", "place"]
-        # self.action = self.socket.recv_string()
-        # self.socket.send_data("Mode received")
-        # print(f"mode - {self.action}")
-        # print(self.socket.recv_string())
+        # action -> ["pick", "place"]
+        self.action = self.socket.recv_string()
+        self.socket.send_data("Mode received")
+        print(f"mode - {self.action}")
+        print(self.socket.recv_string())
 
-        head_tilt= -45
-        data_dir = "./example_data/"
-        colors = np.array(Image.open(os.path.join(data_dir, 'peiqi_test_rgb21.png')))
-        image = Image.open(os.path.join(data_dir, 'peiqi_test_rgb21.png'))
-        # colors = colors / 255.0
-        depths = np.array(Image.open(os.path.join(data_dir, 'peiqi_test_depth21.png')))
-        fx, fy, cx, cy, scale = 306, 306, 118, 211, 0.001
-        self.action = "pick"
-        self.query = "yellow bottle"
-        depths = depths * scale
+        # head_tilt= -45
+        # data_dir = "./example_data/"
+        # colors = np.array(Image.open(os.path.join(data_dir, 'peiqi_test_rgb21.png')))
+        # image = Image.open(os.path.join(data_dir, 'peiqi_test_rgb21.png'))
+        # # colors = colors / 255.0
+        # depths = np.array(Image.open(os.path.join(data_dir, 'peiqi_test_depth21.png')))
+        # fx, fy, cx, cy, scale = 306, 306, 118, 211, 0.001
+        # self.action = "pick"
+        # self.query = "yellow bottle"
+        # depths = depths * scale
         
         # Camera Parameters
-        # image = Image.fromarray(colors)
+        image = Image.fromarray(colors)
         colors = colors / 255.0
         head_tilt = head_tilt / 100
         self.cam = CameraParameters(fx, fy, cx, cy,
@@ -112,7 +112,7 @@ class ObjectHandler():
                 tries = tries + 1
                 print(f"try no: {tries}")
                 data_msg = "No Objects detected, Have to try again"
-                # self.socket.send_data([[0], [0], [0, 0, 2], data_msg])
+                self.socket.send_data([[0], [0], [0, 0, 2], data_msg])
                 # self.socket.send_data("No Objects detected, Have to try again")
 
             bbox_x_min, bbox_y_min, bbox_x_max, bbox_y_max = bbox
@@ -135,7 +135,7 @@ class ObjectHandler():
                 tries = tries + 1
                 print(f"try no: {tries}")
                 data_msg = "No poses, Have to try again"
-                # self.socket.send_data([[0], [0], [0, 0, 2], data_msg])
+                self.socket.send_data([[0], [0], [0, 0, 2], data_msg])
                 # self.socket.send_data("No poses, Have to try again")
 
     def center_robot(self, bbox: Bbox):
@@ -158,7 +158,7 @@ class ObjectHandler():
         print(f"y tilt {tilt}")
 
         data_msg = "Now you received the base and haed trans, good luck."
-        # self.socket.send_data([[-dis], [-tilt], [0, 0, 1], data_msg])
+        self.socket.send_data([[-dis], [-tilt], [0, 0, 1], data_msg])
         # self.socket.send_data("Now you received the base and haed trans, good luck.")
 
     def place(
