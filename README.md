@@ -1,4 +1,4 @@
-<img src="https://user-images.githubusercontent.com/12446953/208367719-4ef7922f-4001-41f7-aa9f-076e462d1325.png" width="60%">
+<!-- <img src="https://user-images.githubusercontent.com/12446953/208367719-4ef7922f-4001-41f7-aa9f-076e462d1325.png" width="60%"> -->
 
 ## Requirements
 - Python 3.6/3.7/3.8/3.9
