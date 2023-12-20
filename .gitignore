@@ -8,7 +8,7 @@ lib_cxx.so
 .TimeRecord
 license
 /src/checkpoints/*
-/src/example_data/*
+# /src/example_data/*
 /pointnet2/*
-*.png
+# *.png
 *.pth
