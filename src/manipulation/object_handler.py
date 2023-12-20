@@ -242,10 +242,10 @@ class ObjectHandler():
         pcd2.points = o3d.utility.Vector3dVector(transformed_points)
         pcd2.colors = o3d.utility.Vector3dVector(colors)
 
-        coordinate_frame1 = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.2, origin=[0, 0, 0])
-        coordinate_frame2 = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.2, origin=[0, 0, 0])        
-        o3d.visualization.draw_geometries([pcd1, coordinate_frame1])
-        o3d.visualization.draw_geometries([pcd2, coordinate_frame2])
+        # coordinate_frame1 = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.2, origin=[0, 0, 0])
+        # coordinate_frame2 = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.2, origin=[0, 0, 0])        
+        # o3d.visualization.draw_geometries([pcd1, coordinate_frame1])
+        # o3d.visualization.draw_geometries([pcd2, coordinate_frame2])
 
         # Projected Median
         xz = np.stack([transformed_x*100, transformed_z*100], axis = -1).astype(int)
