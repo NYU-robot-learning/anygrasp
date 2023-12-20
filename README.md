@@ -6,6 +6,13 @@
 - [MinkowskiEngine](https://github.com/NVIDIA/MinkowskiEngine) v0.5.4
 
 ## Installation
+1. Create Conda environment and install torch
+```bash
+    conda create --name any_grasp python=3.8
+    conda activate any_grasp
+    pip install torch==1.9.0 torchvision==0.10.0 torchaudio==0.9.0
+```
+
 1. Install Minkowski Engine
 ```bash
     pip3 install -U git+https://github.com/NVIDIA/MinkowskiEngine
@@ -13,6 +20,7 @@
 
 2. Install other requirements from Pip.
 ```bash
+    # export SKLEARN_ALLOW_DEPRECATED_SKLEARN_PACKAGE_INSTALL=True # Run this if you facing issues with sklearn install inside graspnertAPI
     pip install -r requirements.txt
 ```
 
