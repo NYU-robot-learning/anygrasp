@@ -18,8 +18,8 @@ cfgs.max_gripper_width = max(0, min(0.1, cfgs.max_gripper_width))
 def demo():
     # print()
     object_handler = ObjectHandler(cfgs)
-    object_handler.manipulate()
+    while True:
+        object_handler.manipulate()
 
 if __name__ == "__main__":
-    while True:
-        demo()
+    demo()

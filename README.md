@@ -37,7 +37,7 @@
 
 5. Installation issues
 ```bash
-    AttributeError: module 'numpy' has no attribute 'float'. : Make sure the installed numpy version 1.23.0
+    AttributeError: module 'numpy' has no attribute 'float'. -> Make sure the installed numpy version 1.23.0
 ```
 
 ## License Registration
@@ -57,5 +57,7 @@ Due to the IP issue, currently only the SDK library file of AnyGrasp is availabl
 ## Demo Code
 Run your code like `demo.py` or any desired applications that uses `gsnet.so`. 
 ```bash
-    cd src/; sh demo.sh
+    cd src/; 
+    sh demo.sh
+    # For just testing grasping remove the open_communication option in demo.sh. 
 ```

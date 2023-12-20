@@ -24,49 +24,54 @@ class ObjectHandler():
         self.grasping_model = AnyGrasp(self.cfgs)
         self.grasping_model.load_net()
 
-        self.socket = ZmqSocket(self.cfgs) 
+        if self.cfgs.open_communication:
+            self.socket = ZmqSocket(self.cfgs) 
 
         self.owl_vit = OwlVITProcessor()
         self.sam = SamProcessor()
         self.lang_sam = LangSAMProcessor()
 
-    def receive_input(self):
-        # Reading color array
-        colors = self.socket.recv_array()
-        self.socket.send_data("RGB received")
+    def receive_input(self, tries):
+        if self.cfgs.open_communication:
+            # Reading color array
+            colors = self.socket.recv_array()
+            self.socket.send_data("RGB received")
 
-        # Depth data
-        depths = self.socket.recv_array()
-        self.socket.send_data("depth received")
+            # Depth data
+            depths = self.socket.recv_array()
+            self.socket.send_data("depth received")
 
-        # Camera Intrinsics
-        fx, fy, cx, cy, head_tilt = self.socket.recv_array()
-        self.socket.send_data("intrinsics received")
+            # Camera Intrinsics
+            fx, fy, cx, cy, head_tilt = self.socket.recv_array()
+            self.socket.send_data("intrinsics received")
 
-        # Object query
-        self.query = self.socket.recv_string()
-        self.socket.send_data("text query received")
-        print(f"text - {self.query}")
+            # Object query
+            self.query = self.socket.recv_string()
+            self.socket.send_data("text query received")
+            print(f"text - {self.query}")
 
-        # action -> ["pick", "place"]
-        self.action = self.socket.recv_string()
-        self.socket.send_data("Mode received")
-        print(f"mode - {self.action}")
-        print(self.socket.recv_string())
+            # action -> ["pick", "place"]
+            self.action = self.socket.recv_string()
+            self.socket.send_data("Mode received")
+            print(f"mode - {self.action}")
+            print(self.socket.recv_string())
 
-        # head_tilt= -45
-        # data_dir = "./example_data/"
-        # colors = np.array(Image.open(os.path.join(data_dir, 'peiqi_test_rgb21.png')))
-        # image = Image.open(os.path.join(data_dir, 'peiqi_test_rgb21.png'))
-        # # colors = colors / 255.0
-        # depths = np.array(Image.open(os.path.join(data_dir, 'peiqi_test_depth21.png')))
-        # fx, fy, cx, cy, scale = 306, 306, 118, 211, 0.001
-        # self.action = "pick"
-        # self.query = "yellow bottle"
-        # depths = depths * scale
+            image = Image.fromarray(colors)
+        else:
+            head_tilt= -45
+            data_dir = "./example_data/"
+            colors = np.array(Image.open(os.path.join(data_dir, 'peiqi_test_rgb21.png')))
+            image = Image.open(os.path.join(data_dir, 'peiqi_test_rgb21.png'))
+            # colors = colors / 255.0
+            depths = np.array(Image.open(os.path.join(data_dir, 'peiqi_test_depth21.png')))
+            fx, fy, cx, cy, scale = 306, 306, 118, 211, 0.001
+            if tries == 1:
+                self.action = str(input("Enter action [pick/place]: "))
+                self.query = str(input("Enter a Object name in the scence: "))
+            depths = depths * scale
         
         # Camera Parameters
-        image = Image.fromarray(colors)
+        
         colors = colors / 255.0
         head_tilt = head_tilt / 100
         self.cam = CameraParameters(fx, fy, cx, cy,
@@ -78,12 +83,27 @@ class ObjectHandler():
     def manipulate(self):
         """
             Wrapper for grasping and placing
+
+            11 is the maximum number of retries incase of object or grasp detection failure
+            Try - 1 -> captures image and centers the robot
+            Try - 2 -> captures image and tries to perform action
+            If failed:
+                Try - 3,4 -> tries in a different camera orientation
+            Even then if it fails: 
+                Try - 5,6,7 -> moves base to left tries again three different camera orientations
+            Even then if it fails:
+                Try - 8,9,10 -> moves base to the right and agian tries three different camera orientations
+            Finally if it fails to detect any pose in above all attempts:
+                Try 11 -> If object is detected but anygrasp couldnt find a pose as a last resort
+                          the cropped object image is sent to the model.
+            In any of the above attempts it is able to succedd it wont perform any further tries
         """
+        
         
         tries = 1 
         retry = True
         while retry and tries <= 11:
-            self.receive_input()
+            self.receive_input(tries)
 
             # Directory for saving visualisations
             self.save_dir = self.cfgs.environment + "/" + self.query + "/anygrasp/" + self.cfgs.method
@@ -111,9 +131,10 @@ class ObjectHandler():
                 print("Didnt detect the object")
                 tries = tries + 1
                 print(f"try no: {tries}")
-                data_msg = "No Objects detected, Have to try again"
-                self.socket.send_data([[0], [0], [0, 0, 2], data_msg])
-                # self.socket.send_data("No Objects detected, Have to try again")
+                if self.cfgs.open_communication:
+                    data_msg = "No Objects detected, Have to try again"
+                    self.socket.send_data([[0], [0], [0, 0, 2], data_msg])
+                    # self.socket.send_data("No Objects detected, Have to try again")
 
             bbox_x_min, bbox_y_min, bbox_x_max, bbox_y_max = bbox
             print(bbox)
@@ -134,9 +155,10 @@ class ObjectHandler():
             if retry:
                 tries = tries + 1
                 print(f"try no: {tries}")
-                data_msg = "No poses, Have to try again"
-                self.socket.send_data([[0], [0], [0, 0, 2], data_msg])
-                # self.socket.send_data("No poses, Have to try again")
+                if self.cfgs.open_communication:
+                    data_msg = "No poses, Have to try again"
+                    self.socket.send_data([[0], [0], [0, 0, 2], data_msg])
+                    # self.socket.send_data("No poses, Have to try again")
 
     def center_robot(self, bbox: Bbox):
         ''' 
@@ -157,9 +179,10 @@ class ObjectHandler():
         tilt = math.atan((bbox_center[1] - self.cam.cy)/self.cam.fy)
         print(f"y tilt {tilt}")
 
-        data_msg = "Now you received the base and haed trans, good luck."
-        self.socket.send_data([[-dis], [-tilt], [0, 0, 1], data_msg])
-        # self.socket.send_data("Now you received the base and haed trans, good luck.")
+        if self.cfgs.open_communication:
+            data_msg = "Now you received the base and haed trans, good luck."
+            self.socket.send_data([[-dis], [-tilt], [0, 0, 1], data_msg])
+            # self.socket.send_data("Now you received the base and haed trans, good luck.")
 
     def place(
         self,
@@ -256,9 +279,11 @@ class ObjectHandler():
         transformed_point = cam_to_3d_rot @ point
 
         print(f"transformed_point: {transformed_point}")
-        data_msg = "Now you received the gripper pose, good luck."
-        self.socket.send_data([np.array(transformed_point, dtype=np.float64), [0], [0, 0, 0], data_msg])
-        # self.socket.send_data("Now you received the gripper pose, good luck.")
+
+        if self.cfgs.open_communication:
+            data_msg = "Now you received the gripper pose, good luck."
+            self.socket.send_data([np.array(transformed_point, dtype=np.float64), [0], [0, 0, 0], data_msg])
+            # self.socket.send_data("Now you received the gripper pose, good luck.")
 
         return True
     
@@ -365,7 +390,8 @@ class ObjectHandler():
                     save_file = self.cfgs.environment + "/" + self.query  + "/anygrasp/" + self.cfgs.method +  "/poses.jpg")
             visualize_cloud_geometries(cloud, [filter_grippers[0]], visualize=True, 
                     save_file = self.cfgs.environment + "/" + self.query  + "/anygrasp/" + self.cfgs.method + "/best_pose.jpg")
-        
-        data_msg = "Now you received the gripper pose, good luck."
-        self.socket.send_data([filter_gg[0].translation, filter_gg[0].rotation_matrix, [filter_gg[0].depth, crop_flag, 0], data_msg])
+
+        if self.cfgs.open_communication:
+            data_msg = "Now you received the gripper pose, good luck."
+            self.socket.send_data([filter_gg[0].translation, filter_gg[0].rotation_matrix, [filter_gg[0].depth, crop_flag, 0], data_msg])
         return True
