@@ -259,6 +259,8 @@ class ObjectHandler():
         data_msg = "Now you received the gripper pose, good luck."
         self.socket.send_data([np.array(transformed_point, dtype=np.float64), [0], [0, 0, 0], data_msg])
         # self.socket.send_data("Now you received the gripper pose, good luck.")
+
+        return True
     
     def pickup(
         self,
@@ -363,5 +365,7 @@ class ObjectHandler():
                     save_file = self.cfgs.environment + "/" + self.query  + "/anygrasp/" + self.cfgs.method +  "/poses.jpg")
             visualize_cloud_geometries(cloud, [filter_grippers[0]], visualize=True, 
                     save_file = self.cfgs.environment + "/" + self.query  + "/anygrasp/" + self.cfgs.method + "/best_pose.jpg")
-    
+        
+        data_msg = "Now you received the gripper pose, good luck."
+        self.socket.send_data([filter_gg[0].translation, filter_gg[0].rotation_matrix, [filter_gg[0].depth, crop_flag, 0], data_msg])
         return True

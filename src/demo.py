@@ -15,10 +15,11 @@ parser.add_argument('--method', default = 'voxel map', help='navigation method n
 cfgs = parser.parse_args()
 cfgs.max_gripper_width = max(0, min(0.1, cfgs.max_gripper_width))
 
-def main():
+def demo():
     # print()
     object_handler = ObjectHandler(cfgs)
     object_handler.manipulate()
 
 if __name__ == "__main__":
-    main()
+    while True:
+        demo()

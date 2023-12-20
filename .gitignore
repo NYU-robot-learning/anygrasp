@@ -9,5 +9,6 @@ lib_cxx.so
 license
 /src/checkpoints/*
 /src/example_data/*
+/pointnet2/*
 *.png
 *.pth
