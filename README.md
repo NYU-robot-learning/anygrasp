@@ -2,8 +2,18 @@
 
 ## Requirements
 - Python 3.6/3.7/3.8/3.9
-- PyTorch 1.7.1 with CUDA 11.0
+- PyTorch 1.7.1 with CUDA 11.8
 - [MinkowskiEngine](https://github.com/NVIDIA/MinkowskiEngine) v0.5.4
+
+### Cuda Setup
+
+These instructions assume Cuda 11.8, it's not tested with more recent stuff.
+
+```
+wget https://developer.download.nvidia.com/compute/cuda/11.8.0/local_installers/cuda_11.8.0_520.61.05_linux.run
+sudo sh cuda_11.8.0_520.61.05_linux.run
+```
+Make sure not to install the drivers or overwrite your system CUDA install when prompted.
 
 ## Installation
 1. Create Conda environment and install torch
