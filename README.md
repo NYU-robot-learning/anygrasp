@@ -10,7 +10,7 @@
 ```bash
     conda create --name any_grasp python=3.8
     conda activate any_grasp
-    pip install torch==1.9.0 torchvision==0.10.0 torchaudio==0.9.0
+    pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
 ```
 
 1. Install Minkowski Engine
