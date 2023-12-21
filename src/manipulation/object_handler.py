@@ -165,7 +165,7 @@ class ObjectHandler():
             Center the robots base and camera to face the center of the Object Bounding box
         '''
 
-        bbox_x_min, bbox_x_max, bbox_y_min, bbox_y_max = bbox
+        bbox_x_min, bbox_y_min, bbox_x_max, bbox_y_max = bbox
 
         bbox_center = [int((bbox_x_min + bbox_x_max)/2), int((bbox_y_min + bbox_y_max)/2)]
         depth_obj = self.cam.depths[bbox_center[1], bbox_center[0]]
