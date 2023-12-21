@@ -27,8 +27,8 @@ class ObjectHandler():
         if self.cfgs.open_communication:
             self.socket = ZmqSocket(self.cfgs) 
 
-        self.owl_vit = OwlVITProcessor()
-        self.sam = SamProcessor()
+        # self.owl_vit = OwlVITProcessor()
+        # self.sam = SamProcessor()
         self.lang_sam = LangSAMProcessor()
 
     def receive_input(self, tries):
@@ -112,10 +112,10 @@ class ObjectHandler():
             self.cam.image.save(self.save_dir + "/clean_" + str(tries) + ".jpg")
 
             # Just for comparing owl_vit vs lang sam this wont be used for further processing, Can be commented if not required
-            bbox =  self.owl_vit.detect_obj(self.cam.image, self.query, visualize_box = True,
-                                                bbox_save_filename=self.cfgs.environment + "/" + \
-                                                self.query + "/anygrasp/" + self.cfgs.method + \
-                                                "/owl_vit_detection_" + str(tries) + ".jpg")
+            # bbox =  self.owl_vit.detect_obj(self.cam.image, self.query, visualize_box = True,
+            #                                     bbox_save_filename=self.cfgs.environment + "/" + \
+            #                                     self.query + "/anygrasp/" + self.cfgs.method + \
+            #                                     "/owl_vit_detection_" + str(tries) + ".jpg")
 
             # Object Segmentaion Mask
             seg_mask, bbox = self.lang_sam.detect_obj(self.cam.image, self.query, 
