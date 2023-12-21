@@ -13,7 +13,11 @@ These instructions assume Cuda 11.8, it's not tested with more recent stuff.
 wget https://developer.download.nvidia.com/compute/cuda/11.8.0/local_installers/cuda_11.8.0_520.61.05_linux.run
 sudo sh cuda_11.8.0_520.61.05_linux.run
 ```
-Make sure not to install the drivers or overwrite your system CUDA install when prompted.
+Make sure not to install the drivers or overwrite your system CUDA install when prompted. You can then set
+```
+CUDA_HOME=/usr/local/cuda-11.8
+```
+This will make sure that the following steps work properly.
 
 ## Installation
 1. Create Conda environment and install torch
@@ -25,6 +29,7 @@ Make sure not to install the drivers or overwrite your system CUDA install when 
 
 1. Install Minkowski Engine
 ```bash
+    pip3 install ninja  # helps avoid compilation issues
     pip3 install -U git+https://github.com/NVIDIA/MinkowskiEngine
 ```
 
