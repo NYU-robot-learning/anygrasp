@@ -1,13 +1,18 @@
-from typing import List, Type
 import copy
 
-import torch
 import numpy as np
-from PIL import ImageDraw, Image
-from matplotlib import pyplot as plt
+from PIL import Image
 import open3d as o3d
 
 from utils.camera import CameraParameters
+
+def sample_points(points, sampling_rate=1):
+    N = len(points)
+    num_samples = int(N*sampling_rate)
+    indices = np.random.choice(N, num_samples, replace=False)
+    sampled_points = points[indices]
+    print(f"sampled points: {sampled_points.shape}")
+    return sampled_points, indices
 
 def get_3d_points(cam: CameraParameters):
 
@@ -24,7 +29,8 @@ def get_3d_points(cam: CameraParameters):
     print(f"y - [{np.min(points_y)}. {np.max(points_y)}]")
     print(f"z - [{np.min(points_z)}. {np.max(points_z)}]")
 
-    return np.stack((points_x, points_y, points_z), axis=2)
+    points = np.stack((points_x, points_y, points_z), axis=2)
+    return points
 
 def show_mask(mask, ax=None, random_color=False):
     if random_color:

@@ -11,7 +11,7 @@ from utils.types import Bbox
 from gsnet import AnyGrasp
 from graspnetAPI import GraspGroup
 from utils.zmq_socket import ZmqSocket
-from utils.utils import get_3d_points, visualize_cloud_geometries
+from utils.utils import get_3d_points, visualize_cloud_geometries, sample_points
 from utils.camera import CameraParameters
 from image_processors import OwlVITProcessor, LangSAMProcessor, SamProcessor
 
@@ -296,9 +296,18 @@ class ObjectHandler():
     ):
         points_x, points_y, points_z = points[:, :, 0], points[:, :, 1], points[:, :, 2]
         
-        mask = (points_z > 0) & (points_z < 2)
+        mask = (points_z > self.cfgs.min_depth) & (points_z < self.cfgs.max_depth)
         points = np.stack([points_x, -points_y, points_z], axis=-1)
         points = points[mask].astype(np.float32)
+
+        colors_m = self.cam.colors[mask].astype(np.float32)
+        print(f"colors input shape {colors_m.shape}")
+        print(points.min(axis=0), points.max(axis=0))
+
+        print(f"points shape: {points.shape}")
+        if self.cfgs.sampling_rate < 1:
+            points, indices = sample_points(points, self.cfgs.sampling_rate)
+            colors_m = colors_m[indices]
         print(f"points shape: {points.shape}")
         xmin = points[:, 0].min()
         xmax = points[:, 0].max()
@@ -308,9 +317,7 @@ class ObjectHandler():
         zmax = points[:, 2].max()
         lims = [xmin, xmax, ymin, ymax, zmin, zmax]
 
-        colors_m = self.cam.colors[mask].astype(np.float32)
-        print(f"colors input shape {colors_m.shape}")
-        print(points.min(axis=0), points.max(axis=0))
+        
 
         # get prediction
         gg, cloud = self.grasping_model.get_grasp(points, colors_m, lims)
