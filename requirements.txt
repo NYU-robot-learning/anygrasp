@@ -1,9 +1,11 @@
 Pillow
 scipy
 tqdm
+scikit-learn
 graspnetAPI
 open3d
 numpy==1.23.0
+zmq
 transformers
 absl-py
 protobuf==3.19.0

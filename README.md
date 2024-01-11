@@ -65,7 +65,7 @@ Due to the IP issue, currently only the SDK library file of AnyGrasp is availabl
     cp ../license_registration/lib_cxx_versions/lib_cxx.cpython-36m-x86_64-linux-gnu.so lib_cxx.so
 ```
 
-2. Unzip your license and put the folder here as `license`. Refer to [license_registration/README.md](./license_registration/README.md) if you have not applied for license.
+2. Unzip your license and put the folder here as `license`. Refer to [license_registration/README.md](./license_registration/README.md) if you have not applied for license. You should receive an email from the anygrasp team with the license.
 
 3. Put model weights under ``checkpoints/``.
 
@@ -75,4 +75,36 @@ Run your code like `demo.py` or any desired applications that uses `gsnet.so`.
     cd src/; 
     sh demo.sh
     # For just testing grasping remove the open_communication option in demo.sh. 
+```
+
+### Troubleshooting
+
+#### Version error
+
+if you see this:
+```
+RuntimeError: module compiled against API version 0x10 but this version of numpy is 0xe
+AttributeError: FvrLicenseWrapper
+
+The above exception was the direct cause of the following exception:
+
+ImportError: initialization failed
+```
+
+Make sure numpy is at version 1.23.0.
+
+#### License Check
+
+You can run the license checker from `src`:
+```
+../license_registration/license_checker -c license/licenseCfg.json 
+```
+
+This will make sure it's set up properly.
+
+```
+$ ../license_registration/license_checker -c license/licenseCfg.json 
+[2024-01-09 15:41:21.548] [info] [FlexivLic] to verify license...
+[2024-01-09 15:41:21.560] [info] [FlexivLic] public key ChrisPaxton.public_key & signature ChrisPaxton.signature are matched
+[2024-01-09 15:41:21.560] [info] [FlexivLic] license license/ChrisPaxton.lic check passed.
 ```
