@@ -5,6 +5,8 @@ from PIL import Image
 import open3d as o3d
 
 from utils.camera import CameraParameters
+from PIL import ImageDraw
+
 
 def sample_points(points, sampling_rate=1):
     N = len(points)
@@ -51,7 +53,24 @@ def draw_seg_mask(image, seg_mask, save_file=None):
 
     if save_file is not None:
         image_pil.save(save_file)
+
+def draw_rectangle(image, bbox, width=5):
+    img_drw = ImageDraw.Draw(image)
+    x1, y1, x2, y2 = bbox[0], bbox[1], bbox[2], bbox[3]
+    # img_drw.rectangle([(bbox[0], bbox[1]), (bbox[2], bbox[3])], outline="green")
+
+    width_increase = 5
+    for _ in range(width_increase):
+        img_drw.rectangle([(x1, y1), (x2, y2)], outline="green")
+
+        # Increase dimensions for the next rectangle
+        x1 -= 1
+        y1 -= 1
+        x2 += 1
+        y2 += 1
     
+    return img_drw
+
 def color_grippers(grippers, max_score, min_score):
     """
         grippers    : list of grippers of form graspnetAPI grasps

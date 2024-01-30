@@ -5,6 +5,7 @@ import copy
 from PIL import Image, ImageDraw
 import numpy as np
 import cv2
+from utils.utils import draw_rectangle
 
 class ImageProcessor(ABC):
     def __init__(self):
@@ -26,8 +27,7 @@ class ImageProcessor(ABC):
         save_file: str = None
     ) -> None:
         new_image = copy.deepcopy(image)
-        img_drw = ImageDraw.Draw(new_image)
-        img_drw.rectangle([(bbox[0], bbox[1]), (bbox[2], bbox[3])], outline="green")
+        draw_rectangle(new_image, bbox)
 
         if save_file is not None:
             new_image.save(save_file)

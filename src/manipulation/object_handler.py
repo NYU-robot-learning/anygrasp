@@ -11,7 +11,7 @@ from utils.types import Bbox
 from gsnet import AnyGrasp
 from graspnetAPI import GraspGroup
 from utils.zmq_socket import ZmqSocket
-from utils.utils import get_3d_points, visualize_cloud_geometries, sample_points
+from utils.utils import get_3d_points, visualize_cloud_geometries, sample_points, draw_rectangle
 from utils.camera import CameraParameters
 from image_processors import OwlVITProcessor, LangSAMProcessor, SamProcessor
 
@@ -39,6 +39,7 @@ class ObjectHandler():
 
             # Depth data
             depths = self.socket.recv_array()
+            # print(np.max(depths), np.min(depths))
             self.socket.send_data("depth received")
 
             # Camera Intrinsics
@@ -59,11 +60,16 @@ class ObjectHandler():
             image = Image.fromarray(colors)
         else:
             head_tilt= -45
+            # data_dir = "/data/peiqi/Pranav Bedroom/chair/anygrasp/voxel map"
+            # colors = np.array(Image.open(os.path.join(data_dir, 'clean_3.jpg')))
+            # image = Image.open(os.path.join(data_dir, 'clean_3.jpg'))
             data_dir = "./example_data/"
             colors = np.array(Image.open(os.path.join(data_dir, 'peiqi_test_rgb21.png')))
             image = Image.open(os.path.join(data_dir, 'peiqi_test_rgb21.png'))
             # colors = colors / 255.0
             depths = np.array(Image.open(os.path.join(data_dir, 'peiqi_test_depth21.png')))
+            # depths = np.array(np.load(os.path.join(data_dir, 'depths_2.npy')))
+            print(depths)
             fx, fy, cx, cy, scale = 306, 306, 118, 211, 0.001
             if tries == 1:
                 self.action = str(input("Enter action [pick/place]: "))
@@ -109,7 +115,9 @@ class ObjectHandler():
             self.save_dir = self.cfgs.environment + "/" + self.query + "/anygrasp/" + self.cfgs.method
             if not os.path.exists(self.save_dir):
                 os.makedirs(self.save_dir)
-            self.cam.image.save(self.save_dir + "/clean_" + str(tries) + ".jpg")
+            if self.cfgs.open_communication:
+                self.cam.image.save(self.save_dir + "/clean_" + str(tries) + ".jpg")
+                np.save(self.save_dir + "/depths_" + str(tries) + ".npy", self.cam.depths)
 
             # Just for comparing owl_vit vs lang sam this wont be used for further processing, Can be commented if not required
             # bbox =  self.owl_vit.detect_obj(self.cam.image, self.query, visualize_box = True,
@@ -140,7 +148,7 @@ class ObjectHandler():
             print(bbox)
 
             # Center the robot
-            if tries == 1:
+            if tries == 1 and self.cfgs.open_communication:
                 self.center_robot(bbox)
                 tries += 1
                 continue
@@ -336,8 +344,9 @@ class ObjectHandler():
         ref_vec = np.array([0, math.cos(self.cam.head_tilt), -math.sin(self.cam.head_tilt)])
         min_score, max_score = 1, -10
         image = copy.deepcopy(self.cam.image)
-        img_drw = ImageDraw.Draw(image)
-        img_drw.rectangle([(bbox_x_min, bbox_y_min), (bbox_x_max, bbox_y_max)], outline="red")
+        img_drw = draw_rectangle(image, bbox)
+        # img_drw = ImageDraw.Draw(image)
+        # img_drw.rectangle([(bbox_x_min, bbox_y_min), (bbox_x_max, bbox_y_max)], outline="red")
         for g in gg:
             grasp_center = g.translation
             ix, iy = int(((grasp_center[0]*self.cam.fx)/grasp_center[2]) + self.cam.cx), int(((-grasp_center[1]*self.cam.fy)/grasp_center[2]) + self.cam.cy)
@@ -361,7 +370,7 @@ class ObjectHandler():
             # print(ix, iy, seg_mask[iy, ix])    
             if not crop_flag:
                 if seg_mask[iy, ix]:
-                    img_drw.ellipse([(ix-1, iy-1), (ix+1, iy+1)], fill = "green")
+                    img_drw.ellipse([(ix-2, iy-2), (ix+2, iy+2)], fill = "green")
                     print(f"diff angle, tilt,  score - {angle}, {g.score}, {score}")
                     if g.score >= 0.095:
                         g.score = score
@@ -370,7 +379,7 @@ class ObjectHandler():
                     max_score = max(max_score, g.score)
                     filter_gg.add(g)
                 else:
-                    img_drw.ellipse([(ix-1, iy-1), (ix+1, iy+1)], fill = "red")
+                    img_drw.ellipse([(ix-2, iy-2), (ix+2, iy+2)], fill = "red")
             else:
                 g.score = score
                 filter_gg.add(g)
@@ -395,7 +404,7 @@ class ObjectHandler():
             
             visualize_cloud_geometries(cloud, grippers, visualize = True, 
                     save_file = self.cfgs.environment + "/" + self.query  + "/anygrasp/" + self.cfgs.method +  "/poses.jpg")
-            visualize_cloud_geometries(cloud, [filter_grippers[0]], visualize=True, 
+            visualize_cloud_geometries(cloud, [filter_grippers[0].paint_uniform_color([1.0, 0.0, 0.0])], visualize=True, 
                     save_file = self.cfgs.environment + "/" + self.query  + "/anygrasp/" + self.cfgs.method + "/best_pose.jpg")
 
         if self.cfgs.open_communication:
