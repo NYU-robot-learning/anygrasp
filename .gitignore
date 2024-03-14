@@ -12,3 +12,7 @@ license
 /src/sample_save_directory/*
 /pointnet2/*
 *.pth
+
+# Vim files
+*.swp
+*.swo
